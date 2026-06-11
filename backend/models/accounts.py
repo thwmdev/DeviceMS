@@ -11,8 +11,10 @@ from models.accM import (
 class TaiKhoan(Base):
     __tablename__ = "TAIKHOAN"
 
-    MaTK = Column(Integer, primary_key=True, index=True)
+    ID_TK = Column(Integer, primary_key=True, autoincrement=True)
+    ID_NV = Column(Integer, ForeignKey("NHANVIEN.ID_NV"), unique=True, nullable=False)
     TenDangNhap = Column(String(50), unique=True, nullable=False)
     MatKhau = Column(String(255), nullable=False)
     VaiTro = Column(String(20), nullable=False)
-    TrangThai = Column(String(20), nullable=False)
+    TrangThai = Column(String(20), default='HoatDong')
+    NgayTao = Column(DateTime, server_default=func.now())

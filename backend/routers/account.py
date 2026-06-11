@@ -20,11 +20,18 @@ def get_accounts():
 @token_and_role_required(allowed_roles=["ADMIN"]) # Chỉ ADMIN mới được tạo tài khoản
 def create_account():
     try:
+        
         data = request.json
-        create_account_db(data)
-        return jsonify({"message": "Tạo tài khoản thành công!"}), 201
-    except ValueError as val_err:
-        return jsonify({"message": str(val_err)}), 400
+        required_fields = ["ID_NV", "TenDangNhap", "MatKhau", "VaiTro"]
+        if not all(field in data for field in required_fields):
+            return jsonify({"message": "Thiếu thông tin bắt buộc!"}), 400
+            
+        try:
+            create_account_db(data)
+            
+            return jsonify({"message": "Tạo tài khoản thành công!"}), 201
+        except ValueError as val_err:
+            return jsonify({"message": str(val_err)}), 400
     except Exception as e:
         return jsonify({"message": "Có lỗi hệ thống xảy ra!"}), 500
 

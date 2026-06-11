@@ -1,6 +1,6 @@
 import jwt
 
-SECRET_KEY = "your_secret"
+SECRET_KEY = "anvadmin"
 
 def encode_token(payload):
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")

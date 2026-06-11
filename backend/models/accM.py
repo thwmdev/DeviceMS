@@ -10,10 +10,8 @@ def create_account_db(data):
         raw_password = data.get("MatKhau") or data.get("password")
         hashed_pw = hash_password(str(raw_password)) 
         
-        cursor.execute("""
-            INSERT INTO TAIKHOAN (TenDangNhap, MatKhau, VaiTro, TrangThai)
-            VALUES (%s, %s, %s, 'HOATDONG')
-        """, (data["TenDangNhap"].strip(), hashed_pw, data["VaiTro"].upper()))
+        cursor.execute("""INSERT INTO TAIKHOAN (ID_NV, TenDangNhap, MatKhau, VaiTro) 
+                   VALUES (%s, %s, %s, %s)""", (data["ID_NV"], data["TenDangNhap"].strip(), hashed_pw, data["VaiTro"].upper()))
         
         conn.commit()
     finally:
