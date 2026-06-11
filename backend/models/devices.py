@@ -1,7 +1,7 @@
 from database.db import get_connection
 
 
-TABLE_NAME = "ThietBi"
+TABLE_NAME = "THIETBI"
 
 DB_STATUS_BY_FRONTEND = {
     "SAN_SANG": "Sẵn sàng",
