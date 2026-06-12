@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../index.css"
@@ -6,6 +6,7 @@ import "../App.css";
 import Sidebar from "../components/sidebar";
 
 const API_URL = "http://127.0.0.1:5000/api/device";
+const CATEGORY_API_URL = "http://127.0.0.1:5000/api/product-category";
 
 const EMPTY_FORM = {
   MaThietBi: "",
@@ -33,6 +34,7 @@ const Devices = () => {
   const [search, setSearch] = useState("");  // giá trị thực gọi API (debounced)
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
+  const [categories, setCategories] = useState([]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -41,15 +43,15 @@ const Devices = () => {
   // ── Token helper ────────────────────────────────────────────────────────
   const getToken = () => localStorage.getItem("token");
 
-  const authHeader = () => ({ Authorization: `Bearer ${getToken()}` });
+  const authHeader = useCallback(() => ({ Authorization: `Bearer ${getToken()}` }), []);
 
   // Khi token hết hạn / không hợp lệ → về login
-  const handleAuthError = (err) => {
+  const handleAuthError = useCallback((err) => {
     if (err?.response?.status === 401) {
       localStorage.clear();
       navigate("/login");
     }
-  };
+  }, [navigate]);
 
   // ── Debounce search: chờ 400ms sau lần gõ cuối rồi mới gọi API ─────────
   useEffect(() => {
@@ -59,6 +61,17 @@ const Devices = () => {
     }, 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const res = await axios.get(`${CATEGORY_API_URL}/list?page=1&limit=100`, {
+        headers: authHeader(),
+      });
+      setCategories((res.data.data || []).filter((category) => category.TrangThai === "HoatDong"));
+    } catch (err) {
+      handleAuthError(err);
+    }
+  }, [authHeader, handleAuthError]);
 
   // ── Load danh sách ───────────────────────────────────────────────────────
   const loadDevices = useCallback(async () => {
@@ -77,9 +90,10 @@ const Devices = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, authHeader, handleAuthError]);
 
   useEffect(() => { loadDevices(); }, [loadDevices]);
+  useEffect(() => { loadCategories(); }, [loadCategories]);
 
   // ── Form helpers ─────────────────────────────────────────────────────────
   const setField = (key, value) =>
@@ -179,8 +193,12 @@ const Devices = () => {
       <Sidebar />
 
       <div className="main-content">
-        <div className="page-header">
-          <h1>QUẢN LÝ THIẾT BỊ</h1>
+        <div className="page-header module-header">
+          <div>
+            <p className="module-kicker">Kho thiết bị</p>
+            <h1>Quản lý thiết bị</h1>
+          </div>
+          <span className="module-count">{total.toLocaleString("vi-VN")} thiết bị</span>
         </div>
 
         {/* ── Search ── */}
@@ -224,9 +242,17 @@ const Devices = () => {
           <input
             type="text"
             placeholder="Loại thiết bị *"
+            list="device-category-options"
             value={formData.LoaiThietBi}
             onChange={(e) => setField("LoaiThietBi", e.target.value)}
           />
+          <datalist id="device-category-options">
+            {categories.map((category) => (
+              <option key={category.ID_DM} value={category.TenDanhMuc}>
+                {category.MaDanhMuc}
+              </option>
+            ))}
+          </datalist>
           <input
             type="date"
             title="Ngày mua"

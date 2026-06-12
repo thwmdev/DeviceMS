@@ -4,15 +4,20 @@ from database.db import get_connection
 TABLE_NAME = "THIETBI"
 
 DB_STATUS_BY_FRONTEND = {
-    "SAN_SANG": "Sẵn sàng",
-    "DA_CAP_PHAT": "Đã câp phât",
-    "THANH_LY": "Thanh Lý",
+    "SAN_SANG": "SanSang",
+    "DA_CAP_PHAT": "DaCapPhat",
+    "THANH_LY": "ThanhLy",
 }
 
 FRONTEND_STATUS_BY_DB = {
     "SanSang": "SAN_SANG",
     "DaCapPhat": "DA_CAP_PHAT",
     "ThanhLy": "THANH_LY",
+    "Sẵn sàng": "SAN_SANG",
+    "Đã cấp phát": "DA_CAP_PHAT",
+    "Đã câp phât": "DA_CAP_PHAT",
+    "Thanh Lý": "THANH_LY",
+    "Thanh lý": "THANH_LY",
 }
 
 

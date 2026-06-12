@@ -2,7 +2,10 @@ node_modules/
 /frontend/node_modules/
 /backend/venv/
 /backend/__pycache__/
-
+/.agents/
+/.claude/
+/.codex/
+/process/
 
 
 /frontend/dist/
@@ -13,7 +16,10 @@ node_modules/
 .env
 .env.local
 .env.*.local
-
+.vc-installed-files
+.vc-version
+AGENTS.md
+CLAUDE.md
 
 
 npm-debug.log*

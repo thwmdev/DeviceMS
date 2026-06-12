@@ -51,4 +51,9 @@ def login():
 
     conn.close()
     payload = {"username": user["TenDangNhap"], "role": user.get("VaiTro")}
-    return jsonify({"token": encode_token(payload), "message": "Đăng nhập thành công"})
+    return jsonify({
+        "token": encode_token(payload),
+        "username": user["TenDangNhap"],
+        "role": user.get("VaiTro"),
+        "message": "Đăng nhập thành công"
+    })

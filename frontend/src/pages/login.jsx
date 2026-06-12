@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 
 import "../App.css";
@@ -33,7 +33,12 @@ const Login = () => {
 
         // Luuw laij token vaf role vaof localStorage
         localStorage.setItem("token", response.data.token);
-        localStorage.setItem("role", response.data.role);
+        if (response.data.role) {
+          localStorage.setItem("role", response.data.role);
+        } else {
+          localStorage.removeItem("role");
+        }
+        localStorage.setItem("username", response.data.username || username);
 
         alert("Đăng nhập thành công!");
         window.location.href = "/dashboard"; 
@@ -52,7 +57,9 @@ const Login = () => {
   return (
     <div className="login-container">
       <form onSubmit={handleLogin} className="login-form">
-        <h2 className="login-title">ĐĂNG NHẬP</h2>
+        <p className="login-eyebrow">DeviceMS</p>
+        <h2 className="login-title">Đăng nhập</h2>
+        <p className="login-subtitle">Quản lý thiết bị nội bộ với giao diện gọn, rõ và bảo mật.</p>
 
 
         {error && <div className="login-error-alert">{error}</div>}
