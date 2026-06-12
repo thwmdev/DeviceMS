@@ -88,9 +88,12 @@ def delete_device_route(matb):
         device = get_device_by_id(matb)
         if not device:
             return jsonify({"message": "Thiết bị không tồn tại."}), 404
+        
+        if device["TrangThai"] == "THANH_LY":
+            return jsonify({"message": "Thiết bị đã được thanh lý."}), 400
 
         soft_delete_device(matb)
-        return jsonify({"message": "Xóa thiết bị thành công."}), 200
+        return jsonify({"message": "Thanh lý thiết bị thành công."}), 200
 
     except ValueError as e:
         return jsonify({"message": str(e)}), 400

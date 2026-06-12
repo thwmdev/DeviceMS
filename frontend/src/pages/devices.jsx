@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import * as XLSX from "xlsx";
 import "../index.css"
 import "../App.css";
 import Sidebar from "../components/sidebar";
@@ -25,6 +26,7 @@ const STATUS_LABEL = {
 
 const Devices = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
   const [devices, setDevices] = useState([]);
   const [page, setPage] = useState(1);
@@ -39,6 +41,8 @@ const Devices = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({ ...EMPTY_FORM });
+  const [openModal, setOpenModal] = useState(false);
+  
 
   // ── Token helper ────────────────────────────────────────────────────────
   const getToken = () => localStorage.getItem("token");
@@ -53,6 +57,100 @@ const Devices = () => {
     }
   }, [navigate]);
 
+  const handleChooseFile = () => {
+    console.log("Import clicked");
+    console.log(fileInputRef.current);
+    fileInputRef.current.click();
+  };
+
+  const handleImportExcel = async (e) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setLoading(false); // Đặt tạm hoặc bật loading tùy bạn
+
+      const data = await file.arrayBuffer();
+      // 1. QUAN TRỌNG: cellDates: true để ép excel parse ngày tháng thành Object Date của JS
+      const workbook = XLSX.read(data, { type: "array", cellDates: true });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet);
+
+      if (rows.length === 0) {
+        alert("File Excel không có dữ liệu!");
+        return;
+      }
+
+      let successCount = 0;
+
+      // 2. Chuyển sang vòng lặp tuần tự để không bị crash nghẽn hệ thống
+      for (const row of rows) {
+        if (!row.TenThietBi || !row.LoaiThietBi) continue;
+
+        // ── XỬ LÝ CHUẨN HÓA NGÀY MUA (Đưa về YYYY-MM-DD giống form nhập tay) ──
+        let ngayMuaChuan = "";
+        if (row.NgayMua) {
+          if (row.NgayMua instanceof Date && !isNaN(row.NgayMua)) {
+            const yyyy = row.NgayMua.getFullYear();
+            const mm = String(row.NgayMua.getMonth() + 1).padStart(2, '0');
+            const dd = String(row.NgayMua.getDate()).padStart(2, '0');
+            ngayMuaChuan = `${yyyy}-${mm}-${dd}`; // Kết quả chuẩn: "2026-08-26"
+          } else {
+            // Nếu vẫn là chuỗi thô thì giữ nguyên hoặc xử lý chuỗi cắt ra
+            ngayMuaChuan = row.NgayMua.toString().trim();
+          }
+        }
+
+        // ── XỬ LÝ NGUYÊN GIÁ (Bỏ dấu phân cách thập phân kiểu Mỹ/Việt) ──
+        let giaTriChuan = 0;
+        if (row.GiaTri != null && row.GiaTri !== "") {
+          let giaTriStr = row.GiaTri.toString().trim();
+          if (giaTriStr.includes(",") && giaTriStr.includes(".")) {
+            giaTriStr = giaTriStr.replace(/,/g, ""); // Xóa dấu phẩy hàng nghìn, giữ dấu chấm .00
+          } else if (giaTriStr.includes(".") && giaTriStr.includes(",")) {
+            giaTriStr = giaTriStr.replace(/\./g, "").replace(/,/g, "."); // Kiểu VN
+          } else if (giaTriStr.includes(",") && !giaTriStr.includes(".")) {
+            giaTriStr = giaTriStr.replace(/,/g, "");
+          }
+          const parsedValue = parseFloat(giaTriStr);
+          giaTriChuan = !isNaN(parsedValue) ? Math.round(parsedValue) : 0;
+        }
+
+        // 3. Tiến hành gửi lên API giống cấu trúc form của bạn
+        try {
+          await axios.post(
+            `${API_URL}/create`,
+            {
+              TenThietBi: row.TenThietBi.trim(),
+              LoaiThietBi: row.LoaiThietBi.trim(),
+              NgayMua: ngayMuaChuan, // Gửi chuỗi YYYY-MM-DD
+              GiaTri: giaTriChuan,   // Gửi số nguyên chuẩn
+              TrangThai: "SAN_SANG", // Đồng bộ text viết hoa
+            },
+            {
+              headers: authHeader(),
+            }
+          );
+          successCount++;
+        } catch (rowErr) {
+          console.error("Lỗi dòng Excel:", rowErr?.response?.data || rowErr.message);
+        }
+      }
+
+      alert(`Import thành công ${successCount}/${rows.length} thiết bị!`);
+      
+      // ── ĐỒNG BỘ UI (Tự động load lại data không cần F5) ──
+      setPage(1);
+      await loadDevices();
+      
+      e.target.value = ""; // Reset input file
+    } catch (err) {
+      console.error(err);
+      alert("Import thất bại!");
+    }
+  };
+
+
   // ── Debounce search: chờ 400ms sau lần gõ cuối rồi mới gọi API ─────────
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -62,17 +160,7 @@ const Devices = () => {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const loadCategories = useCallback(async () => {
-    try {
-      const res = await axios.get(`${CATEGORY_API_URL}/list?page=1&limit=100`, {
-        headers: authHeader(),
-      });
-      setCategories((res.data.data || []).filter((category) => category.TrangThai === "HoatDong"));
-    } catch (err) {
-      handleAuthError(err);
-    }
-  }, [authHeader, handleAuthError]);
-
+  
   // ── Load danh sách ───────────────────────────────────────────────────────
   const loadDevices = useCallback(async () => {
     try {
@@ -92,8 +180,25 @@ const Devices = () => {
     }
   }, [page, search, authHeader, handleAuthError]);
 
+  // -- Load Category --------------------------------------------------  
+  const loadCategories = async () => {
+    try {
+      const res = await axios.get(
+        "http://127.0.0.1:5000/api/product-category/list?limit=100",
+        {
+          headers: authHeader()
+        }
+      );
+
+      setCategories(res.data.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => { loadCategories();}, []);
   useEffect(() => { loadDevices(); }, [loadDevices]);
-  useEffect(() => { loadCategories(); }, [loadCategories]);
+
 
   // ── Form helpers ─────────────────────────────────────────────────────────
   const setField = (key, value) =>
@@ -156,17 +261,17 @@ const Devices = () => {
   };
 
   const handleDelete = async (matb, tenThietBi) => {
-    if (!window.confirm(`Xóa thiết bị "${tenThietBi}"?`)) return;
+    if (!window.confirm(`Thanh lý thiết bị "${tenThietBi}"?`)) return;
     try {
       setLoading(true);
       await axios.delete(`${API_URL}/delete/${matb}`, { headers: authHeader() });
-      alert("Xóa thành công!");
+      alert("Thanh lý thành công!");
       // Nếu trang hiện tại không còn dữ liệu sau khi xóa, lùi về trang trước
       if (devices.length === 1 && page > 1) setPage((p) => p - 1);
       else loadDevices();
     } catch (err) {
       handleAuthError(err);
-      alert(err?.response?.data?.message || "Xóa thất bại.");
+      alert(err?.response?.data?.message || "Thanh lý thất bại.");
     } finally {
       setLoading(false);
     }
@@ -216,83 +321,150 @@ const Devices = () => {
           )}
         </div>
 
-        {/* ── Form thêm / sửa ── */}
-        <div className="device-form">
-          <h2>{isEditing ? "Cập nhật thiết bị" : "Thêm thiết bị mới"}</h2>
-
-          {formError && (
-            <div className="form-error" style={{ gridColumn: "1 / -1" }}>
-              ⚠️ {formError}
-            </div>
-          )}
-
-          <input
-            type="text"
-            placeholder={isEditing ? "Mã thiết bị *" : "Mã thiết bị tự sinh khi lưu"}
-            value={isEditing ? formData.MaThietBi : ""}
-            onChange={(e) => setField("MaThietBi", e.target.value)}
-            disabled={!isEditing}
-          />
-          <input
-            type="text"
-            placeholder="Tên thiết bị *"
-            value={formData.TenThietBi}
-            onChange={(e) => setField("TenThietBi", e.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Loại thiết bị *"
-            list="device-category-options"
-            value={formData.LoaiThietBi}
-            onChange={(e) => setField("LoaiThietBi", e.target.value)}
-          />
-          <datalist id="device-category-options">
-            {categories.map((category) => (
-              <option key={category.ID_DM} value={category.TenDanhMuc}>
-                {category.MaDanhMuc}
-              </option>
-            ))}
-          </datalist>
-          <input
-            type="date"
-            title="Ngày mua"
-            value={formData.NgayMua}
-            onChange={(e) => setField("NgayMua", e.target.value)}
-          />
-          <input
-            type="number"
-            placeholder="Giá trị (VNĐ)"
-            min="0"
-            value={formData.GiaTri}
-            onChange={(e) => setField("GiaTri", e.target.value)}
-          />
-          <select
-            value={formData.TrangThai}
-            onChange={(e) => setField("TrangThai", e.target.value)}
+        <div className="add-device-action">
+          <button className="btn-primary" onClick={() => {
+            resetForm();
+            setIsEditing(false);
+            setOpenModal(true);
+          }}
           >
-            <option value="SAN_SANG">Sẵn sàng</option>
-            <option value="DA_CAP_PHAT">Đã cấp phát</option>
-            <option value="THANH_LY">Thanh lý</option>
-          </select>
+            + Thêm thiết bị
+          </button>
 
-          {/* Buttons – luôn nằm ở hàng cuối, full width */}
-          <div className="form-actions" style={{ gridColumn: "1 / -1" }}>
-            {isEditing ? (
-              <>
-                <button onClick={handleUpdate} disabled={loading} className="btn-primary">
-                  {loading ? "Đang lưu..." : "💾 Cập nhật"}
-                </button>
-                <button onClick={resetForm} disabled={loading} className="btn-secondary">
-                  ✕ Hủy
-                </button>
-              </>
-            ) : (
-              <button onClick={handleCreate} disabled={loading} className="btn-primary">
-                {loading ? "Đang lưu..." : "+ Thêm thiết bị"}
-              </button>
-            )}
-          </div>
+          <button
+            className="btn-primary"
+            onClick={handleChooseFile}
+          >
+            Import Excel
+          </button>
+
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            onChange={handleImportExcel}
+          />
         </div>
+
+        {openModal && (
+          <div
+            className="modal-overlay"
+            onClick={() => setOpenModal(false)}
+          >
+            <div
+              className="device-modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+
+              <div className="device-modal-header">
+                <h2>
+                  {isEditing
+                    ? "Cập nhật thiết bị"
+                    : "Thêm thiết bị mới"}
+                </h2>
+
+                <button
+                  onClick={() => setOpenModal(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="device-modal-body">
+
+                <div className="form-group">
+                  <label>Tên thiết bị <span>*</span></label>
+                  <input
+                    type="text"
+                    placeholder="VD: Laptop Dell Latitude 7440"
+                    value={formData.TenThietBi}
+                    onChange={(e) =>
+                      setField("TenThietBi", e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Loại thiết bị <span>*</span></label>
+
+                  <select
+                    value={formData.LoaiThietBi}
+                    onChange={(e) => setField("LoaiThietBi", e.target.value)}
+                  >
+                    <option value="">Chọn loại thiết bị</option>
+
+                    {categories.map((item) => (
+                      <option
+                        key={item.ID_DM}
+                        value={item.TenDanhMuc}
+                      >
+                        {item.TenDanhMuc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-row">
+
+                  <div className="form-group">
+                    <label>Ngày mua</label>
+                    <input 
+                      type="date" 
+                      value={formData.NgayMua}
+                      onChange={(e) =>
+                      setField("NgayMua", e.target.value)
+                    } />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Nguyên giá (₫)</label>
+                    <input
+                      type="number"
+                      placeholder="VD: 22000000"
+                      value={formData.GiaTri}
+                      onChange={(e) =>
+                        setField("GiaTri", e.target.value)
+                      }
+                    />
+                  </div>
+
+                </div>
+
+              </div>
+
+              <div className="device-modal-footer">
+
+                <button
+                  className="btn-cancel"
+                  onClick={() => setOpenModal(false)}
+                >
+                  Hủy
+                </button>
+
+                <button
+                  className="btn-save"
+                  onClick={async () => {
+                    if (isEditing) {
+                      await handleUpdate();
+                    } else {
+                      await handleCreate();
+                    }
+
+                    setOpenModal(false);
+                  }}
+                >
+                  {isEditing
+                    ? "Cập nhật"
+                    : "Lưu thiết bị"}
+                </button>
+
+              </div>
+
+            </div>
+          </div>
+        )}
+
+
 
         {/* ── Table ── */}
         <table className="device-table">
@@ -304,17 +476,18 @@ const Devices = () => {
               <th>Ngày mua</th>
               <th>Giá trị</th>
               <th>Trạng thái</th>
+              <th>Người dùng</th>
               <th>Hành động</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="7">⏳ Đang tải dữ liệu...</td>
+                <td colSpan="8">⏳ Đang tải dữ liệu...</td>
               </tr>
             ) : devices.length === 0 ? (
               <tr>
-                <td colSpan="7">Không có dữ liệu</td>
+                <td colSpan="8">Không có dữ liệu</td>
               </tr>
             ) : (
               devices.map((device) => (
@@ -338,24 +511,31 @@ const Devices = () => {
                     </span>
                   </td>
                   <td>
+                    <span></span>
+                  </td>
+                  <td>
                     <button
                       className="btn-edit"
-                      onClick={() => handleEdit(device)}
+                      onClick={() => { handleEdit(device);; setOpenModal(true); }}
                       disabled={loading}
                     >
-                      ✏️ Sửa
+                      ✏️
                     </button>
+
                     <button
                       className="btn-delete"
                       onClick={() => handleDelete(device.MaTB, device.TenThietBi)}
-                      disabled={loading || device.TrangThai === "DA_CAP_PHAT"}
+                      disabled={loading || device.TrangThai === "DA_CAP_PHAT" || device.TrangThai === "THANH_LY"}
                       title={
                         device.TrangThai === "DA_CAP_PHAT"
                           ? "Không thể xóa thiết bị đang cấp phát"
-                          : "Xóa thiết bị"
+                          : "Thanh lý thiết bị",
+                        device.TrangThai === "THANH_LY"
+                          ? "Thiết bị đã được thanh lý!"
+                          : "Thanh lý thiết bị."
                       }
                     >
-                      🗑️ Xóa
+                      🗑️
                     </button>
                   </td>
                 </tr>

@@ -89,7 +89,7 @@ def get_devices_paginated(page=1, limit=10, search=""):
             SELECT *
             FROM {TABLE_NAME}
             {where_clause}
-            ORDER BY ID_TB DESC
+            ORDER BY ID_TB ASC
             LIMIT %s OFFSET %s
         """
         params.extend([limit, offset])
@@ -155,7 +155,7 @@ def create_device(data):
                 data["LoaiThietBi"],
                 data.get("NgayMua") or None,
                 data.get("GiaTri") or None,
-                normalize_status_for_db(data.get("TrangThai")),
+                normalize_status_for_db(data.get("TrangThai", "SanSang")),
             ),
         )
         conn.commit()
@@ -244,8 +244,8 @@ def soft_delete_device(matb):
         cursor.close()
         cursor = conn.cursor()
         cursor.execute(
-            f"DELETE FROM {TABLE_NAME} WHERE ID_TB = %s",
-            (matb,),
+            f"UPDATE {TABLE_NAME} SET TrangThai = %s WHERE ID_TB = %s",
+            ("THANH_LY", matb,),
         )
         conn.commit()
     except Exception:
