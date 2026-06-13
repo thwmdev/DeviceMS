@@ -1,15 +1,25 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import * as XLSX from "xlsx";
-import "../index.css"
+import "../index.css";
 import "../App.css";
 import Sidebar from "../components/sidebar";
+import SortableHeader from "../components/SortableHeader";
+import { getNextSort, sortRows } from "../utils/tableSort";
 
 const API_URL = "http://127.0.0.1:5000/api/device";
 const CATEGORY_API_URL = "http://127.0.0.1:5000/api/product-category";
 
-const EMPTY_FORM = {
+const EMPTY_ROW = {
+  TenThietBi: "",
+  LoaiThietBi: "",
+  NgayMua: "",
+  GiaTri: "",
+  TrangThai: "SAN_SANG",
+};
+
+const EMPTY_EDIT_FORM = {
   MaThietBi: "",
   TenThietBi: "",
   LoaiThietBi: "",
@@ -24,32 +34,79 @@ const STATUS_LABEL = {
   THANH_LY: "Thanh lý",
 };
 
-const Devices = () => {
+const generateBatchId = () => {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const rand = Math.floor(Math.random() * 900 + 100);
+  return `${date}_${time}_${rand}`;
+};
+
+const formatDateInput = (value) => {
+  if (!value) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, "0");
+    const dd = String(value.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return String(value).trim();
+};
+
+const normalizeMoney = (value) => {
+  if (value === null || value === undefined || value === "") return "";
+  let text = String(value).trim();
+  if (text.includes(".") && text.includes(",")) {
+    text = text.replace(/\./g, "").replace(/,/g, ".");
+  } else if (text.includes(",")) {
+    text = text.replace(/,/g, "");
+  }
+  const parsed = Number.parseFloat(text);
+  return Number.isNaN(parsed) ? "" : Math.round(parsed);
+};
+
+export default function Devices() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
+  // Role
+  const role = (localStorage.getItem("role") || "").toUpperCase();
+  const isUser = role === "USER";
+
+  // List state
   const [devices, setDevices] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [searchInput, setSearchInput] = useState("");  // giá trị ô input
-  const [search, setSearch] = useState("");  // giá trị thực gọi API (debounced)
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
-  const [formError, setFormError] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: "MaTB", direction: "asc" });
+
+  // Batch filter
+  const [batches, setBatches] = useState([]);
+  const [batchFilter, setBatchFilter] = useState("");
+
+  // Categories
   const [categories, setCategories] = useState([]);
 
-  const [isEditing, setIsEditing] = useState(false);
+  // Edit modal state (single device edit)
+  const [openEditModal, setOpenEditModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({ ...EMPTY_FORM });
-  const [openModal, setOpenModal] = useState(false);
-  
+  const [editForm, setEditForm] = useState({ ...EMPTY_EDIT_FORM });
+  const [editError, setEditError] = useState("");
 
-  // ── Token helper ────────────────────────────────────────────────────────
-  const getToken = () => localStorage.getItem("token");
+  // Batch create modal state
+  const [openBatchModal, setOpenBatchModal] = useState(false);
+  const [batchId, setBatchId] = useState("");
+  const [batchRows, setBatchRows] = useState([{ ...EMPTY_ROW }]);
+  const [batchError, setBatchError] = useState("");
 
-  const authHeader = useCallback(() => ({ Authorization: `Bearer ${getToken()}` }), []);
+  const authHeader = useCallback(() => ({
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  }), []);
 
-  // Khi token hết hạn / không hợp lệ → về login
   const handleAuthError = useCallback((err) => {
     if (err?.response?.status === 401) {
       localStorage.clear();
@@ -57,118 +114,18 @@ const Devices = () => {
     }
   }, [navigate]);
 
-  const handleChooseFile = () => {
-    console.log("Import clicked");
-    console.log(fileInputRef.current);
-    fileInputRef.current.click();
-  };
-
-  const handleImportExcel = async (e) => {
-    try {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      setLoading(false); // Đặt tạm hoặc bật loading tùy bạn
-
-      const data = await file.arrayBuffer();
-      // 1. QUAN TRỌNG: cellDates: true để ép excel parse ngày tháng thành Object Date của JS
-      const workbook = XLSX.read(data, { type: "array", cellDates: true });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet);
-
-      if (rows.length === 0) {
-        alert("File Excel không có dữ liệu!");
-        return;
-      }
-
-      let successCount = 0;
-
-      // 2. Chuyển sang vòng lặp tuần tự để không bị crash nghẽn hệ thống
-      for (const row of rows) {
-        if (!row.TenThietBi || !row.LoaiThietBi) continue;
-
-        // ── XỬ LÝ CHUẨN HÓA NGÀY MUA (Đưa về YYYY-MM-DD giống form nhập tay) ──
-        let ngayMuaChuan = "";
-        if (row.NgayMua) {
-          if (row.NgayMua instanceof Date && !isNaN(row.NgayMua)) {
-            const yyyy = row.NgayMua.getFullYear();
-            const mm = String(row.NgayMua.getMonth() + 1).padStart(2, '0');
-            const dd = String(row.NgayMua.getDate()).padStart(2, '0');
-            ngayMuaChuan = `${yyyy}-${mm}-${dd}`; // Kết quả chuẩn: "2026-08-26"
-          } else {
-            // Nếu vẫn là chuỗi thô thì giữ nguyên hoặc xử lý chuỗi cắt ra
-            ngayMuaChuan = row.NgayMua.toString().trim();
-          }
-        }
-
-        // ── XỬ LÝ NGUYÊN GIÁ (Bỏ dấu phân cách thập phân kiểu Mỹ/Việt) ──
-        let giaTriChuan = 0;
-        if (row.GiaTri != null && row.GiaTri !== "") {
-          let giaTriStr = row.GiaTri.toString().trim();
-          if (giaTriStr.includes(",") && giaTriStr.includes(".")) {
-            giaTriStr = giaTriStr.replace(/,/g, ""); // Xóa dấu phẩy hàng nghìn, giữ dấu chấm .00
-          } else if (giaTriStr.includes(".") && giaTriStr.includes(",")) {
-            giaTriStr = giaTriStr.replace(/\./g, "").replace(/,/g, "."); // Kiểu VN
-          } else if (giaTriStr.includes(",") && !giaTriStr.includes(".")) {
-            giaTriStr = giaTriStr.replace(/,/g, "");
-          }
-          const parsedValue = parseFloat(giaTriStr);
-          giaTriChuan = !isNaN(parsedValue) ? Math.round(parsedValue) : 0;
-        }
-
-        // 3. Tiến hành gửi lên API giống cấu trúc form của bạn
-        try {
-          await axios.post(
-            `${API_URL}/create`,
-            {
-              TenThietBi: row.TenThietBi.trim(),
-              LoaiThietBi: row.LoaiThietBi.trim(),
-              NgayMua: ngayMuaChuan, // Gửi chuỗi YYYY-MM-DD
-              GiaTri: giaTriChuan,   // Gửi số nguyên chuẩn
-              TrangThai: "SAN_SANG", // Đồng bộ text viết hoa
-            },
-            {
-              headers: authHeader(),
-            }
-          );
-          successCount++;
-        } catch (rowErr) {
-          console.error("Lỗi dòng Excel:", rowErr?.response?.data || rowErr.message);
-        }
-      }
-
-      alert(`Import thành công ${successCount}/${rows.length} thiết bị!`);
-      
-      // ── ĐỒNG BỘ UI (Tự động load lại data không cần F5) ──
-      setPage(1);
-      await loadDevices();
-      
-      e.target.value = ""; // Reset input file
-    } catch (err) {
-      console.error(err);
-      alert("Import thất bại!");
-    }
-  };
-
-
-  // ── Debounce search: chờ 400ms sau lần gõ cuối rồi mới gọi API ─────────
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearch(searchInput);
-      setPage(1);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
-  
-  // ── Load danh sách ───────────────────────────────────────────────────────
   const loadDevices = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get(
-        `${API_URL}/list?page=${page}&limit=10&search=${encodeURIComponent(search)}`,
-        { headers: authHeader() }
-      );
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "10",
+        search,
+      });
+      if (batchFilter) params.set("batch_id", batchFilter);
+      const res = await axios.get(`${API_URL}/list?${params.toString()}`, {
+        headers: authHeader(),
+      });
       setDevices(res.data.data || []);
       setTotalPages(res.data.total_pages || 1);
       setTotal(res.data.total || 0);
@@ -178,97 +135,165 @@ const Devices = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search, authHeader, handleAuthError]);
+  }, [authHeader, handleAuthError, page, search, batchFilter]);
 
-  // -- Load Category --------------------------------------------------  
-  const loadCategories = async () => {
+  const loadBatches = useCallback(async () => {
     try {
-      const res = await axios.get(
-        "http://127.0.0.1:5000/api/product-category/list?limit=100",
-        {
-          headers: authHeader()
-        }
-      );
+      const res = await axios.get(`${API_URL}/batches`, { headers: authHeader() });
+      setBatches(res.data.batches || []);
+    } catch {
+      // không cần alert
+    }
+  }, [authHeader]);
 
+  const loadCategories = useCallback(async () => {
+    try {
+      const res = await axios.get(`${CATEGORY_API_URL}/list?limit=100`, {
+        headers: authHeader(),
+      });
       setCategories(res.data.data || []);
     } catch (err) {
-      console.error(err);
+      handleAuthError(err);
     }
-  };
+  }, [authHeader, handleAuthError]);
 
-  useEffect(() => { loadCategories();}, []);
+  useEffect(() => { loadCategories(); }, [loadCategories]);
+
+  useEffect(() => {
+    if (!isUser) loadBatches();
+  }, [loadBatches, isUser]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   useEffect(() => { loadDevices(); }, [loadDevices]);
 
+  const tableRows = useMemo(() => devices.map((device) => ({
+    ...device,
+    TrangThaiText: STATUS_LABEL[device.TrangThai] || device.TrangThai,
+  })), [devices]);
 
-  // ── Form helpers ─────────────────────────────────────────────────────────
-  const setField = (key, value) =>
-    setFormData((prev) => ({ ...prev, [key]: value }));
+  const sortedDevices = useMemo(
+    () => sortRows(tableRows, sortConfig),
+    [tableRows, sortConfig],
+  );
 
-  const resetForm = () => {
-    setFormData({ ...EMPTY_FORM });
-    setIsEditing(false);
-    setEditingId(null);
-    setFormError("");
+  // ── Batch create modal ──────────────────────────────────────────
+  const openBatchCreateModal = () => {
+    setBatchId(generateBatchId());
+    setBatchRows([{ ...EMPTY_ROW }]);
+    setBatchError("");
+    setOpenBatchModal(true);
   };
 
-  const validateForm = () => {
-    if (isEditing && !formData.MaThietBi.trim()) { setFormError("Mã thiết bị không được để trống."); return false; }
-    if (!formData.TenThietBi.trim()) { setFormError("Tên thiết bị không được để trống."); return false; }
-    if (!formData.LoaiThietBi.trim()) { setFormError("Loại thiết bị không được để trống."); return false; }
-    if (formData.GiaTri !== "" && Number(formData.GiaTri) < 0) {
-      setFormError("Giá trị không hợp lệ.");
+  const setBatchRowField = (index, key, value) => {
+    setBatchRows((prev) => prev.map((row, i) => i === index ? { ...row, [key]: value } : row));
+  };
+
+  const addBatchRow = () => setBatchRows((prev) => [...prev, { ...EMPTY_ROW }]);
+
+  const removeBatchRow = (index) => {
+    setBatchRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleBatchCreate = async () => {
+    const validRows = batchRows.filter((r) => r.TenThietBi.trim() && r.LoaiThietBi.trim());
+    if (validRows.length === 0) {
+      setBatchError("Cần ít nhất 1 dòng có tên và loại thiết bị.");
+      return;
+    }
+    try {
+      setLoading(true);
+      let successCount = 0;
+      for (const row of validRows) {
+        try {
+          await axios.post(
+            `${API_URL}/create`,
+            { ...row, MaDot: batchId },
+            { headers: authHeader() },
+          );
+          successCount += 1;
+        } catch (rowErr) {
+          console.error("Lỗi dòng:", rowErr?.response?.data || rowErr.message);
+        }
+      }
+      alert(`Thêm thành công ${successCount}/${validRows.length} thiết bị (đợt ${batchId}).`);
+      setOpenBatchModal(false);
+      await Promise.all([loadDevices(), loadBatches()]);
+    } catch (err) {
+      handleAuthError(err);
+      setBatchError(err?.response?.data?.message || "Thêm thiết bị thất bại.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Single edit modal ───────────────────────────────────────────
+  const handleOpenEditModal = (device) => {
+    setEditingId(device.MaTB);
+    setEditForm({
+      MaThietBi: device.MaThietBi || "",
+      TenThietBi: device.TenThietBi || "",
+      LoaiThietBi: device.LoaiThietBi || "",
+      NgayMua: device.NgayMua ? device.NgayMua.substring(0, 10) : "",
+      GiaTri: device.GiaTri ?? "",
+      TrangThai: device.TrangThai || "SAN_SANG",
+    });
+    setEditError("");
+    setOpenEditModal(true);
+  };
+
+  const validateEditForm = () => {
+    if (!String(editForm.MaThietBi).trim()) {
+      setEditError("Mã thiết bị không được để trống.");
       return false;
     }
-    setFormError("");
+    if (!editForm.TenThietBi.trim()) {
+      setEditError("Tên thiết bị không được để trống.");
+      return false;
+    }
+    if (!editForm.LoaiThietBi.trim()) {
+      setEditError("Loại thiết bị không được để trống.");
+      return false;
+    }
+    if (editForm.GiaTri !== "" && Number(editForm.GiaTri) < 0) {
+      setEditError("Giá trị không hợp lệ.");
+      return false;
+    }
+    setEditError("");
     return true;
   };
 
-  // ── CRUD ─────────────────────────────────────────────────────────────────
-  const handleCreate = async () => {
-    if (!validateForm()) return;
-    try {
-      setLoading(true);
-      const res = await axios.post(`${API_URL}/create`, formData, { headers: authHeader() });
-      alert(`Thêm thiết bị thành công! Mã thiết bị: ${res.data.MaThietBi}`);
-      resetForm();
-      loadDevices();
-    } catch (err) {
-      handleAuthError(err);
-      setFormError(err?.response?.data?.message || "Thêm thiết bị thất bại.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleUpdate = async () => {
-    if (!validateForm()) return;
+    if (!validateEditForm()) return;
     try {
       setLoading(true);
-      await axios.put(
-        `${API_URL}/update/${editingId}`,
-        formData,
-        { headers: authHeader() }
-      );
-      alert("Cập nhật thành công!");
-      resetForm();
-      loadDevices();
+      await axios.put(`${API_URL}/update/${editingId}`, editForm, { headers: authHeader() });
+      alert("Cập nhật thiết bị thành công.");
+      setOpenEditModal(false);
+      await loadDevices();
     } catch (err) {
       handleAuthError(err);
-      setFormError(err?.response?.data?.message || "Cập nhật thất bại.");
+      setEditError(err?.response?.data?.message || "Cập nhật thiết bị thất bại.");
     } finally {
       setLoading(false);
     }
   };
 
+  // ── Delete (thanh lý) ───────────────────────────────────────────
   const handleDelete = async (matb, tenThietBi) => {
     if (!window.confirm(`Thanh lý thiết bị "${tenThietBi}"?`)) return;
     try {
       setLoading(true);
       await axios.delete(`${API_URL}/delete/${matb}`, { headers: authHeader() });
-      alert("Thanh lý thành công!");
-      // Nếu trang hiện tại không còn dữ liệu sau khi xóa, lùi về trang trước
-      if (devices.length === 1 && page > 1) setPage((p) => p - 1);
-      else loadDevices();
+      alert("Thanh lý thành công.");
+      if (devices.length === 1 && page > 1) setPage((current) => current - 1);
+      else await loadDevices();
     } catch (err) {
       handleAuthError(err);
       alert(err?.response?.data?.message || "Thanh lý thất bại.");
@@ -277,299 +302,433 @@ const Devices = () => {
     }
   };
 
-  const handleEdit = (device) => {
-    setIsEditing(true);
-    setEditingId(device.MaTB);
-    setFormData({
-      MaThietBi: device.MaThietBi || "",
-      TenThietBi: device.TenThietBi || "",
-      LoaiThietBi: device.LoaiThietBi || "",
-      NgayMua: device.NgayMua ? device.NgayMua.substring(0, 10) : "",
-      GiaTri: device.GiaTri ?? "",
-      TrangThai: device.TrangThai || "SAN_SANG",
-    });
-    setFormError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  // ── Excel import ────────────────────────────────────────────────
+  const handleChooseFile = () => fileInputRef.current?.click();
+
+  const handleImportExcel = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setLoading(true);
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array", cellDates: true });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet);
+
+      if (rows.length === 0) { alert("File Excel không có dữ liệu."); return; }
+
+      const importBatchId = generateBatchId();
+      let successCount = 0;
+      for (const row of rows) {
+        if (!row.TenThietBi || !row.LoaiThietBi) continue;
+        try {
+          await axios.post(
+            `${API_URL}/create`,
+            {
+              TenThietBi: String(row.TenThietBi).trim(),
+              LoaiThietBi: String(row.LoaiThietBi).trim(),
+              NgayMua: formatDateInput(row.NgayMua),
+              GiaTri: normalizeMoney(row.GiaTri),
+              TrangThai: "SAN_SANG",
+              MaDot: importBatchId,
+            },
+            { headers: authHeader() },
+          );
+          successCount += 1;
+        } catch (rowErr) {
+          console.error("Lỗi dòng Excel:", rowErr?.response?.data || rowErr.message);
+        }
+      }
+      alert(`Import thành công ${successCount}/${rows.length} thiết bị (đợt ${importBatchId}).`);
+      setPage(1);
+      await Promise.all([loadDevices(), loadBatches()]);
+    } catch (err) {
+      console.error(err);
+      alert("Import thất bại.");
+    } finally {
+      event.target.value = "";
+      setLoading(false);
+    }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="page-container">
       <Sidebar />
 
-      <div className="main-content">
+      <main className="main-content">
         <div className="page-header module-header">
           <div>
             <p className="module-kicker">Kho thiết bị</p>
-            <h1>Quản lý thiết bị</h1>
+            <h1>{isUser ? "Thiết bị của công ty" : "Quản lý thiết bị"}</h1>
           </div>
           <span className="module-count">{total.toLocaleString("vi-VN")} thiết bị</span>
         </div>
 
-        {/* ── Search ── */}
         <div className="search-container">
           <input
             type="text"
             placeholder="Tìm kiếm theo mã hoặc tên thiết bị..."
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            onChange={(event) => setSearchInput(event.target.value)}
           />
+          {!isUser && batches.length > 0 && (
+            <select
+              className="filter-select"
+              value={batchFilter}
+              onChange={(event) => { setBatchFilter(event.target.value); setPage(1); }}
+            >
+              <option value="">Tất cả đợt nhập</option>
+              {batches.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+          )}
           {search && (
             <span className="search-result-hint">
-              Kết quả tìm kiếm cho "{search}": {total} thiết bị
+              Kết quả cho &quot;{search}&quot;: {total} thiết bị
             </span>
           )}
         </div>
 
-        <div className="add-device-action">
-          <button className="btn-primary" onClick={() => {
-            resetForm();
-            setIsEditing(false);
-            setOpenModal(true);
-          }}
-          >
-            + Thêm thiết bị
-          </button>
-
-          <button
-            className="btn-primary"
-            onClick={handleChooseFile}
-          >
-            Import Excel
-          </button>
-
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            ref={fileInputRef}
-            style={{ display: "none" }}
-            onChange={handleImportExcel}
-          />
-        </div>
-
-        {openModal && (
-          <div
-            className="modal-overlay"
-            onClick={() => setOpenModal(false)}
-          >
-            <div
-              className="device-modal"
-              onClick={(e) => e.stopPropagation()}
-            >
-
-              <div className="device-modal-header">
-                <h2>
-                  {isEditing
-                    ? "Cập nhật thiết bị"
-                    : "Thêm thiết bị mới"}
-                </h2>
-
-                <button
-                  onClick={() => setOpenModal(false)}
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="device-modal-body">
-
-                <div className="form-group">
-                  <label>Tên thiết bị <span>*</span></label>
-                  <input
-                    type="text"
-                    placeholder="VD: Laptop Dell Latitude 7440"
-                    value={formData.TenThietBi}
-                    onChange={(e) =>
-                      setField("TenThietBi", e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Loại thiết bị <span>*</span></label>
-
-                  <select
-                    value={formData.LoaiThietBi}
-                    onChange={(e) => setField("LoaiThietBi", e.target.value)}
-                  >
-                    <option value="">Chọn loại thiết bị</option>
-
-                    {categories.map((item) => (
-                      <option
-                        key={item.ID_DM}
-                        value={item.TenDanhMuc}
-                      >
-                        {item.TenDanhMuc}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-row">
-
-                  <div className="form-group">
-                    <label>Ngày mua</label>
-                    <input 
-                      type="date" 
-                      value={formData.NgayMua}
-                      onChange={(e) =>
-                      setField("NgayMua", e.target.value)
-                    } />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Nguyên giá (₫)</label>
-                    <input
-                      type="number"
-                      placeholder="VD: 22000000"
-                      value={formData.GiaTri}
-                      onChange={(e) =>
-                        setField("GiaTri", e.target.value)
-                      }
-                    />
-                  </div>
-
-                </div>
-
-              </div>
-
-              <div className="device-modal-footer">
-
-                <button
-                  className="btn-cancel"
-                  onClick={() => setOpenModal(false)}
-                >
-                  Hủy
-                </button>
-
-                <button
-                  className="btn-save"
-                  onClick={async () => {
-                    if (isEditing) {
-                      await handleUpdate();
-                    } else {
-                      await handleCreate();
-                    }
-
-                    setOpenModal(false);
-                  }}
-                >
-                  {isEditing
-                    ? "Cập nhật"
-                    : "Lưu thiết bị"}
-                </button>
-
-              </div>
-
-            </div>
+        {!isUser && (
+          <div className="table-toolbar">
+            <button className="btn-primary" onClick={openBatchCreateModal}>
+              + Thêm thiết bị
+            </button>
+            <button className="btn-primary" onClick={handleChooseFile}>
+              Import Excel
+            </button>
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              ref={fileInputRef}
+              style={{ display: "none" }}
+              onChange={handleImportExcel}
+            />
           </div>
         )}
 
-
-
-        {/* ── Table ── */}
         <table className="device-table">
           <thead>
             <tr>
-              <th>Mã</th>
-              <th>Tên thiết bị</th>
-              <th>Loại</th>
-              <th>Ngày mua</th>
-              <th>Giá trị</th>
-              <th>Trạng thái</th>
-              <th>Người dùng</th>
-              <th>Hành động</th>
+              <th>
+                <SortableHeader
+                  label="Mã"
+                  sortKey="MaTB"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Tên thiết bị"
+                  sortKey="TenThietBi"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Loại"
+                  sortKey="LoaiThietBi"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Ngày mua"
+                  sortKey="NgayMua"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Giá trị"
+                  sortKey="GiaTri"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Trạng thái"
+                  sortKey="TrangThaiText"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              {!isUser && <th>Hành động</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="8">⏳ Đang tải dữ liệu...</td>
+                <td colSpan={isUser ? 6 : 7}>Đang tải dữ liệu...</td>
               </tr>
-            ) : devices.length === 0 ? (
+            ) : sortedDevices.length === 0 ? (
               <tr>
-                <td colSpan="8">Không có dữ liệu</td>
+                <td colSpan={isUser ? 6 : 7}>Không có dữ liệu</td>
               </tr>
             ) : (
-              devices.map((device) => (
+              sortedDevices.map((device) => (
                 <tr key={device.MaTB}>
                   <td>{device.MaThietBi}</td>
                   <td>{device.TenThietBi}</td>
                   <td>{device.LoaiThietBi}</td>
+                  <td>{device.NgayMua ? new Date(device.NgayMua).toLocaleDateString("vi-VN") : "-"}</td>
                   <td>
-                    {device.NgayMua
-                      ? new Date(device.NgayMua).toLocaleDateString("vi-VN")
-                      : "—"}
-                  </td>
-                  <td>
-                    {device.GiaTri != null && device.GiaTri !== ""
-                      ? Number(device.GiaTri).toLocaleString("vi-VN") + " ₫"
-                      : "—"}
+                    {device.GiaTri !== null && device.GiaTri !== ""
+                      ? `${Number(device.GiaTri).toLocaleString("vi-VN")} ₫`
+                      : "-"}
                   </td>
                   <td>
                     <span className={`status-badge status-${device.TrangThai}`}>
                       {STATUS_LABEL[device.TrangThai] || device.TrangThai}
                     </span>
                   </td>
-                  <td>
-                    <span></span>
-                  </td>
-                  <td>
-                    <button
-                      className="btn-edit"
-                      onClick={() => { handleEdit(device);; setOpenModal(true); }}
-                      disabled={loading}
-                    >
-                      ✏️
-                    </button>
-
-                    <button
-                      className="btn-delete"
-                      onClick={() => handleDelete(device.MaTB, device.TenThietBi)}
-                      disabled={loading || device.TrangThai === "DA_CAP_PHAT" || device.TrangThai === "THANH_LY"}
-                      title={
-                        device.TrangThai === "DA_CAP_PHAT"
-                          ? "Không thể xóa thiết bị đang cấp phát"
-                          : "Thanh lý thiết bị",
-                        device.TrangThai === "THANH_LY"
-                          ? "Thiết bị đã được thanh lý!"
-                          : "Thanh lý thiết bị."
-                      }
-                    >
-                      🗑️
-                    </button>
-                  </td>
+                  {!isUser && (
+                    <td>
+                      <div className="table-actions">
+                        <button className="btn-edit" onClick={() => handleOpenEditModal(device)} disabled={loading}>
+                          Sửa
+                        </button>
+                        <button
+                          className="btn-delete"
+                          onClick={() => handleDelete(device.MaTB, device.TenThietBi)}
+                          disabled={loading || device.TrangThai === "DA_CAP_PHAT" || device.TrangThai === "THANH_LY"}
+                          title={
+                            device.TrangThai === "DA_CAP_PHAT"
+                              ? "Không thể thanh lý thiết bị đang cấp phát"
+                              : "Thanh lý thiết bị"
+                          }
+                        >
+                          Thanh lý
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
           </tbody>
         </table>
 
-        {/* ── Pagination ── */}
         <div className="pagination">
-          <button disabled={page === 1 || loading} onClick={() => setPage(1)}>
-            «
-          </button>
-          <button disabled={page === 1 || loading} onClick={() => setPage((p) => p - 1)}>
-            ‹ Trước
-          </button>
+          <button disabled={page === 1 || loading} onClick={() => setPage(1)}>«</button>
+          <button disabled={page === 1 || loading} onClick={() => setPage((current) => current - 1)}>‹ Trước</button>
           <span>Trang {page} / {totalPages}</span>
-          <button
-            disabled={page === totalPages || loading}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Sau ›
-          </button>
-          <button
-            disabled={page === totalPages || loading}
-            onClick={() => setPage(totalPages)}
-          >
-            »
-          </button>
+          <button disabled={page === totalPages || loading} onClick={() => setPage((current) => current + 1)}>Sau ›</button>
+          <button disabled={page === totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
         </div>
 
-      </div>
+        {/* ── Batch create modal ─────────────────────────────────── */}
+        {openBatchModal && (
+          <div className="modal-overlay" onClick={() => setOpenBatchModal(false)}>
+            <div className="device-modal batch-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="device-modal-header">
+                <div className="device-modal-title">
+                  <div className="device-modal-icon">TB</div>
+                  <div>
+                    <h2>Thêm thiết bị mới</h2>
+                    <p style={{ fontSize: "0.78rem", color: "var(--text-muted, #888)" }}>
+                      Mã đợt: <strong>{batchId}</strong>
+                    </p>
+                  </div>
+                </div>
+                <button className="modal-close-btn" onClick={() => setOpenBatchModal(false)}>×</button>
+              </div>
+
+              <div className="device-modal-body">
+                {batchError && <div className="form-error modal-error">{batchError}</div>}
+
+                <div style={{ overflowX: "auto" }}>
+                  <table className="device-table batch-input-table">
+                    <thead>
+                      <tr>
+                        <th style={{ minWidth: 30 }}>#</th>
+                        <th style={{ minWidth: 200 }}>Tên thiết bị <span>*</span></th>
+                        <th style={{ minWidth: 160 }}>Loại thiết bị <span>*</span></th>
+                        <th style={{ minWidth: 140 }}>Ngày mua</th>
+                        <th style={{ minWidth: 130 }}>Nguyên giá (₫)</th>
+                        <th style={{ minWidth: 40 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batchRows.map((row, idx) => (
+                        <tr key={idx}>
+                          <td style={{ textAlign: "center", color: "var(--text-muted, #888)" }}>{idx + 1}</td>
+                          <td>
+                            <input
+                              type="text"
+                              style={{ width: "100%" }}
+                              placeholder="VD: Laptop Dell Latitude"
+                              value={row.TenThietBi}
+                              onChange={(e) => setBatchRowField(idx, "TenThietBi", e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <select
+                              style={{ width: "100%" }}
+                              value={row.LoaiThietBi}
+                              onChange={(e) => setBatchRowField(idx, "LoaiThietBi", e.target.value)}
+                            >
+                              <option value="">Chọn loại</option>
+                              {categories.map((item) => (
+                                <option key={item.ID_DM} value={item.TenDanhMuc}>{item.TenDanhMuc}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="date"
+                              style={{ width: "100%" }}
+                              value={row.NgayMua}
+                              onChange={(e) => setBatchRowField(idx, "NgayMua", e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              min="0"
+                              style={{ width: "100%" }}
+                              placeholder="0"
+                              value={row.GiaTri}
+                              onChange={(e) => setBatchRowField(idx, "GiaTri", e.target.value)}
+                            />
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            {batchRows.length > 1 && (
+                              <button
+                                type="button"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#e74c3c", fontSize: "1rem" }}
+                                onClick={() => removeBatchRow(idx)}
+                                title="Xóa dòng này"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ marginTop: "0.75rem" }}
+                  onClick={addBatchRow}
+                >
+                  + Thêm dòng
+                </button>
+              </div>
+
+              <div className="device-modal-footer">
+                <button className="btn-cancel" onClick={() => setOpenBatchModal(false)} disabled={loading}>Hủy</button>
+                <button className="btn-save" onClick={handleBatchCreate} disabled={loading}>
+                  {loading ? "Đang lưu..." : `Lưu ${batchRows.length} thiết bị`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Single edit modal ──────────────────────────────────── */}
+        {openEditModal && (
+          <div className="modal-overlay" onClick={() => setOpenEditModal(false)}>
+            <div className="device-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="device-modal-header">
+                <div className="device-modal-title">
+                  <div className="device-modal-icon">TB</div>
+                  <div>
+                    <h2>Cập nhật thiết bị</h2>
+                    <p>Chỉnh sửa thông tin thiết bị trong kho.</p>
+                  </div>
+                </div>
+                <button className="modal-close-btn" onClick={() => setOpenEditModal(false)}>×</button>
+              </div>
+
+              <div className="device-modal-body modal-form">
+                {editError && <div className="form-error modal-error">{editError}</div>}
+
+                <div className="form-group">
+                  <label>Mã thiết bị <span>*</span></label>
+                  <input
+                    type="number"
+                    value={editForm.MaThietBi}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, MaThietBi: e.target.value }))}
+                  />
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Tên thiết bị <span>*</span></label>
+                    <input
+                      type="text"
+                      value={editForm.TenThietBi}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, TenThietBi: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Loại thiết bị <span>*</span></label>
+                    <select
+                      value={editForm.LoaiThietBi}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, LoaiThietBi: e.target.value }))}
+                    >
+                      <option value="">Chọn loại thiết bị</option>
+                      {categories.map((item) => (
+                        <option key={item.ID_DM} value={item.TenDanhMuc}>{item.TenDanhMuc}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Ngày mua</label>
+                    <input
+                      type="date"
+                      value={editForm.NgayMua}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, NgayMua: e.target.value }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Nguyên giá (₫)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editForm.GiaTri}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, GiaTri: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Trạng thái</label>
+                  <select
+                    value={editForm.TrangThai}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, TrangThai: e.target.value }))}
+                  >
+                    <option value="SAN_SANG">Sẵn sàng</option>
+                    <option value="DA_CAP_PHAT">Đã cấp phát</option>
+                    <option value="THANH_LY">Thanh lý</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="device-modal-footer">
+                <button className="btn-cancel" onClick={() => setOpenEditModal(false)} disabled={loading}>Hủy</button>
+                <button className="btn-save" onClick={handleUpdate} disabled={loading}>
+                  {loading ? "Đang lưu..." : "Cập nhật"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
-};
-
-export default Devices;
+}

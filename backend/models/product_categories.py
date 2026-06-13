@@ -4,6 +4,34 @@ from database.db import get_connection
 TABLE_NAME = "DANHMUCSANPHAM"
 
 
+def _ensure_ma_dot_column():
+    """Tự động thêm cột MaDot nếu chưa có."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        if not conn:
+            return
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'DANHMUCSANPHAM'
+              AND COLUMN_NAME = 'MaDot'
+            """
+        )
+        if cursor.fetchone()["cnt"] == 0:
+            cursor.execute("ALTER TABLE DANHMUCSANPHAM ADD COLUMN MaDot VARCHAR(50) NULL")
+            conn.commit()
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 def ensure_category_table():
     conn = None
     cursor = None
@@ -49,6 +77,7 @@ def normalize_category(row):
         "TrangThai": row["TrangThai"],
         "NgayTao": ngay_tao.isoformat() if hasattr(ngay_tao, "isoformat") else str(ngay_tao or ""),
         "NgayCapNhat": ngay_cap_nhat.isoformat() if hasattr(ngay_cap_nhat, "isoformat") else str(ngay_cap_nhat or ""),
+        "MaDot": row.get("MaDot") or "",
     }
 
 
@@ -79,8 +108,9 @@ def validate_category_payload(data, is_update=False):
     }
 
 
-def get_categories_paginated(page=1, limit=10, search=""):
+def get_categories_paginated(page=1, limit=10, search="", batch_id=""):
     ensure_category_table()
+    _ensure_ma_dot_column()
     conn = None
     cursor = None
     try:
@@ -97,6 +127,10 @@ def get_categories_paginated(page=1, limit=10, search=""):
             where_clause += " AND (MaDanhMuc LIKE %s OR TenDanhMuc LIKE %s OR MoTa LIKE %s)"
             keyword = f"%{search}%"
             params.extend([keyword, keyword, keyword])
+
+        if batch_id:
+            where_clause += " AND MaDot = %s"
+            params.append(batch_id)
 
         cursor.execute(f"SELECT COUNT(*) AS total FROM {TABLE_NAME} {where_clause}", tuple(params))
         total = cursor.fetchone()["total"]
@@ -126,6 +160,27 @@ def get_categories_paginated(page=1, limit=10, search=""):
             conn.close()
 
 
+def get_category_batches():
+    """Trả về danh sách các mã đợt đã dùng."""
+    _ensure_ma_dot_column()
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        if not conn:
+            raise Exception("Khong the ket noi co so du lieu.")
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT DISTINCT MaDot FROM {TABLE_NAME} WHERE MaDot IS NOT NULL AND MaDot != '' ORDER BY MaDot DESC"
+        )
+        return [row[0] for row in cursor.fetchall()]
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 def get_category_by_id(category_id):
     ensure_category_table()
     conn = None
@@ -147,7 +202,9 @@ def get_category_by_id(category_id):
 
 def create_category(data):
     ensure_category_table()
+    _ensure_ma_dot_column()
     payload = validate_category_payload(data)
+    ma_dot = str(data.get("MaDot") or "").strip() or None
     conn = None
     cursor = None
     try:
@@ -158,14 +215,15 @@ def create_category(data):
         cursor = conn.cursor()
         cursor.execute(
             f"""
-            INSERT INTO {TABLE_NAME} (MaDanhMuc, TenDanhMuc, MoTa, TrangThai)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO {TABLE_NAME} (MaDanhMuc, TenDanhMuc, MoTa, TrangThai, MaDot)
+            VALUES (%s, %s, %s, %s, %s)
             """,
             (
                 payload["MaDanhMuc"],
                 payload["TenDanhMuc"],
                 payload["MoTa"],
                 payload["TrangThai"],
+                ma_dot,
             ),
         )
         conn.commit()

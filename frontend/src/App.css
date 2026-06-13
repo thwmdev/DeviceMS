@@ -631,6 +631,32 @@
   font-size: 13px;
 }
 
+.filter-select {
+  min-height: 46px;
+  padding: 10px 14px;
+  color: var(--ink);
+  background: rgba(251, 250, 247, .9);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 16px;
+  outline: none;
+  transition: border-color .22s var(--ease), box-shadow .22s var(--ease), transform .22s var(--ease);
+}
+
+.filter-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(49, 90, 88, .11);
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: 1320px;
+  margin: 0 auto 18px;
+}
+
 /* --- FORMS --- */
 .device-form {
   display: grid;
@@ -830,6 +856,36 @@ textarea:focus-visible {
   letter-spacing: .04em;
 }
 
+.table-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+}
+
+.table-sort-button span:first-child {
+  flex: 1;
+}
+
+.table-sort-button span:last-child {
+  color: var(--accent);
+  font-size: 10px;
+  opacity: .7;
+}
+
+.table-sort-button.active span:last-child {
+  opacity: 1;
+}
+
 .device-table td {
   padding: 14px 10px;
   color: var(--ink);
@@ -868,6 +924,18 @@ textarea:focus-visible {
   font-size: 13px;
 }
 
+.block-text {
+  display: block;
+  margin-top: 5px;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -900,26 +968,100 @@ textarea:focus-visible {
   background: #f2e1bd;
 }
 
+.status-PENDING {
+  color: #7a4b14;
+  background: #f2e1bd;
+}
+
+.status-APPROVED {
+  color: #23583d;
+  background: #dcebe1;
+}
+
+.status-REJECTED {
+  color: #7f231e;
+  background: #efd6d2;
+}
+
+.request-type-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.type-CAP_PHAT {
+  color: #244745;
+  background: #dce8e7;
+}
+
+.type-THU_HOI {
+  color: #623d0f;
+  background: #f5dfb9;
+}
+
 /* --- MODAL --- */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.55);
+  background: rgba(23, 36, 33, .58);
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: 18px;
   z-index: 9999;
 }
 
 .device-modal {
-  width: 36%;
+  width: min(720px, 95vw);
   max-width: 95vw;
+  max-height: min(92dvh, 860px);
   background: #242321;
   color: #f5f2eb;
   border-radius: 24px;
   border: 1px solid rgba(255,255,255,.08);
-  overflow: hidden;
+  overflow: auto;
   box-shadow: 0 24px 80px rgba(0,0,0,.45);
+}
+
+.wide-modal {
+  width: min(860px, 95vw);
+}
+
+/* Batch modal: wider để chứa nhiều cột */
+.batch-modal {
+  width: min(1100px, 96vw);
+}
+
+/* Bảng nhập liệu hàng loạt trong modal */
+.batch-input-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.82rem;
+}
+
+.batch-input-table th,
+.batch-input-table td {
+  padding: 6px 8px;
+  border: 1px solid rgba(255,255,255,.08);
+  vertical-align: middle;
+}
+
+.batch-input-table thead th {
+  background: rgba(255,255,255,.04);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.batch-input-table input,
+.batch-input-table select {
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  border-radius: 6px;
 }
 
 .device-modal-header {
@@ -996,22 +1138,59 @@ textarea:focus-visible {
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
-  height: 52px;
-  padding: 0 16px;
+  min-height: 52px;
+  padding: 14px 16px;
   background: #2b2a28;
   border: 1px solid rgba(255,255,255,.08);
   border-radius: 12px;
   color: white;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
 
   border-color: #0f8b70;
+}
+
+.form-group textarea {
+  resize: vertical;
+}
+
+.modal-form {
+  gap: 18px;
+}
+
+.modal-error {
+  color: #ffd7d0;
+  background: rgba(180, 67, 59, .18);
+  border-color: rgba(244, 212, 207, .22);
+}
+
+.review-summary {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px 16px;
+  padding: 16px;
+  color: #f5f2eb;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+}
+
+.review-summary span {
+  color: #bdb7ac;
+  font-size: 13px;
+}
+
+.review-summary strong {
+  color: #fffdf7;
+  font-size: 14px;
 }
 
 .device-modal-footer {
@@ -1043,6 +1222,17 @@ textarea:focus-visible {
   border: none;
   border-radius: 12px;
   background: #0f8b70;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-danger-solid {
+  height: 48px;
+  padding: 0 28px;
+  border: none;
+  border-radius: 12px;
+  background: var(--danger);
   color: white;
   font-weight: 700;
   cursor: pointer;
@@ -1150,6 +1340,18 @@ textarea:focus-visible {
 
   .form-actions button {
     width: 100%;
+  }
+
+  .form-row,
+  .review-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .device-modal-header,
+  .device-modal-body,
+  .device-modal-footer {
+    padding-right: 20px;
+    padding-left: 20px;
   }
 
   .login-container {

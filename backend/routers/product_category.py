@@ -5,6 +5,7 @@ from models.product_categories import (
     create_category,
     delete_category,
     get_categories_paginated,
+    get_category_batches,
     get_category_by_id,
     toggle_category_status,
     update_category,
@@ -12,21 +13,33 @@ from models.product_categories import (
 
 product_category_bp = Blueprint("product_category", __name__)
 
+VIEW_ROLES = ["ADMIN", "HR"]
+
 
 @product_category_bp.route("/list", methods=["GET"])
-@token_and_role_required(allowed_roles=["ADMIN", "HR"])
+@token_and_role_required(allowed_roles=VIEW_ROLES)
 def list_categories():
     try:
         page = max(1, int(request.args.get("page", 1)))
         limit = max(1, min(100, int(request.args.get("limit", 10))))
         search = request.args.get("search", "").strip()
-        return jsonify(get_categories_paginated(page=page, limit=limit, search=search)), 200
+        batch_id = request.args.get("batch_id", "").strip()
+        return jsonify(get_categories_paginated(page=page, limit=limit, search=search, batch_id=batch_id)), 200
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500
+
+
+@product_category_bp.route("/batches", methods=["GET"])
+@token_and_role_required(allowed_roles=VIEW_ROLES)
+def list_category_batches():
+    try:
+        return jsonify({"batches": get_category_batches()}), 200
     except Exception as e:
         return jsonify({"message": str(e)}), 500
 
 
 @product_category_bp.route("/detail/<int:category_id>", methods=["GET"])
-@token_and_role_required(allowed_roles=["ADMIN", "HR"])
+@token_and_role_required(allowed_roles=VIEW_ROLES)
 def category_detail(category_id):
     try:
         category = get_category_by_id(category_id)

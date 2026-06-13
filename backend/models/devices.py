@@ -41,6 +41,34 @@ def parse_device_id(value):
     return device_id
 
 
+def _ensure_ma_dot_column():
+    """Tự động thêm cột MaDot nếu chưa có."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        if not conn:
+            return
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'THIETBI'
+              AND COLUMN_NAME = 'MaDot'
+            """
+        )
+        if cursor.fetchone()["cnt"] == 0:
+            cursor.execute("ALTER TABLE THIETBI ADD COLUMN MaDot VARCHAR(50) NULL")
+            conn.commit()
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 def map_to_frontend(db_device):
     if not db_device:
         return None
@@ -59,10 +87,12 @@ def map_to_frontend(db_device):
         "NgayMua": ngay_mua,
         "GiaTri": float(db_device["NguyenGia"]) if db_device["NguyenGia"] is not None else None,
         "TrangThai": normalize_status_for_frontend(db_device["TrangThai"]),
+        "MaDot": db_device.get("MaDot") or "",
     }
 
 
-def get_devices_paginated(page=1, limit=10, search=""):
+def get_devices_paginated(page=1, limit=10, search="", batch_id=""):
+    _ensure_ma_dot_column()
     conn = None
     cursor = None
     try:
@@ -80,6 +110,10 @@ def get_devices_paginated(page=1, limit=10, search=""):
             where_clause += " AND (CAST(ID_TB AS CHAR) LIKE %s OR TenThietBi LIKE %s)"
             keyword = f"%{search}%"
             params.extend([keyword, keyword])
+
+        if batch_id:
+            where_clause += " AND MaDot = %s"
+            params.append(batch_id)
 
         count_query = f"SELECT COUNT(*) AS total FROM {TABLE_NAME} {where_clause}"
         cursor.execute(count_query, tuple(params))
@@ -110,6 +144,27 @@ def get_devices_paginated(page=1, limit=10, search=""):
             conn.close()
 
 
+def get_device_batches():
+    """Trả về danh sách các mã đợt đã dùng (DISTINCT MaDot)."""
+    _ensure_ma_dot_column()
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        if not conn:
+            raise Exception("Khong the ket noi co so du lieu.")
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT DISTINCT MaDot FROM {TABLE_NAME} WHERE MaDot IS NOT NULL AND MaDot != '' ORDER BY MaDot DESC"
+        )
+        return [row[0] for row in cursor.fetchall()]
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 def get_device_by_id(matb):
     conn = None
     cursor = None
@@ -132,6 +187,7 @@ def get_device_by_id(matb):
 
 
 def create_device(data):
+    _ensure_ma_dot_column()
     conn = None
     cursor = None
     try:
@@ -144,10 +200,12 @@ def create_device(data):
         cursor.execute(f"SELECT COALESCE(MAX(ID_TB), 0) + 1 FROM {TABLE_NAME}")
         device_id = cursor.fetchone()[0]
 
+        ma_dot = str(data.get("MaDot") or "").strip() or None
+
         cursor.execute(
             f"""
-            INSERT INTO {TABLE_NAME} (ID_TB, TenThietBi, Loai, NgayMua, NguyenGia, TrangThai)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO {TABLE_NAME} (ID_TB, TenThietBi, Loai, NgayMua, NguyenGia, TrangThai, MaDot)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 device_id,
@@ -156,6 +214,7 @@ def create_device(data):
                 data.get("NgayMua") or None,
                 data.get("GiaTri") or None,
                 normalize_status_for_db(data.get("TrangThai", "SanSang")),
+                ma_dot,
             ),
         )
         conn.commit()
