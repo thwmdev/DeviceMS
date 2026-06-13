@@ -12,17 +12,17 @@ account_bp = Blueprint("account", __name__)
 
 
 @account_bp.route("/list", methods=["GET"])
-@token_and_role_required(allowed_roles=["ADMIN", "MANAGER"]) # Bảo mật API
+@token_and_role_required(allowed_roles=["ADMIN"]) 
 def get_accounts():
     return jsonify(get_all_accounts())
 
 @account_bp.route("/create", methods=["POST"])
-@token_and_role_required(allowed_roles=["ADMIN"]) # Chỉ ADMIN mới được tạo tài khoản
+@token_and_role_required(allowed_roles=["ADMIN"]) 
 def create_account():
     try:
         
         data = request.json
-        required_fields = ["ID_NV", "TenDangNhap", "MatKhau", "VaiTro"]
+        required_fields = ["TenDangNhap", "MatKhau", "VaiTro", "HoTen", "Email"] 
         if not all(field in data for field in required_fields):
             return jsonify({"message": "Thiếu thông tin bắt buộc!"}), 400
             
@@ -33,6 +33,7 @@ def create_account():
         except ValueError as val_err:
             return jsonify({"message": str(val_err)}), 400
     except Exception as e:
+        print(e)
         return jsonify({"message": "Có lỗi hệ thống xảy ra!"}), 500
 
 @account_bp.route("/update/<int:matk>", methods=["PUT"])

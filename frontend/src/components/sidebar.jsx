@@ -25,8 +25,10 @@ const getStoredUser = () => {
 
 const PERMISSIONS = {
   manageAccounts: (role) => {
+<<<<<<< HEAD
     const normalized = role?.toUpperCase();
     return normalized === "ADMIN" || normalized === "MANAGER";
+=======
   },
   viewProductCategories: (role) => {
     const normalized = role?.toUpperCase();
@@ -103,6 +105,7 @@ export default function Sidebar() {
             <span>Danh mục sản phẩm</span>
           </li>
         )}
+        
         {user && PERMISSIONS.manageAccounts(user.role) && (
           <li
             className={`menu-item ${currentPath === "/accounts" ? "active" : ""}`}
@@ -110,6 +113,16 @@ export default function Sidebar() {
           >
             <i className="ti ti-users" />
             <span>Quản lý tài khoản</span>
+          </li>
+
+        )}
+        {user && PERMISSIONS.manageAccounts(user.role) && (
+          <li
+            className={`menu-item ${currentPath === '/depreciation' ? 'active' : ''}`}
+            onClick={() => navigate('/depreciation')}
+          >
+            <i className="ti ti-calculator" />
+            <span>Thiết lập khấu hao</span>
           </li>
         )}
       </ul>
