@@ -25,10 +25,8 @@ const getStoredUser = () => {
 
 const PERMISSIONS = {
   manageAccounts: (role) => {
-<<<<<<< HEAD
     const normalized = role?.toUpperCase();
     return normalized === "ADMIN" || normalized === "MANAGER";
-=======
   },
   viewProductCategories: (role) => {
     const normalized = role?.toUpperCase();
