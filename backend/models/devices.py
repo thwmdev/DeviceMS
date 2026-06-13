@@ -41,8 +41,8 @@ def parse_device_id(value):
     return device_id
 
 
-def _ensure_ma_dot_column():
-    """Tự động thêm cột MaDot nếu chưa có."""
+def _ensure_device_columns():
+    """Tự động thêm các cột MaDot, NgayThanhLy, NgayTao nếu chưa có."""
     conn = None
     cursor = None
     try:
@@ -50,6 +50,8 @@ def _ensure_ma_dot_column():
         if not conn:
             return
         cursor = conn.cursor(dictionary=True)
+        
+        # Thêm MaDot
         cursor.execute(
             """
             SELECT COUNT(*) AS cnt
@@ -61,6 +63,36 @@ def _ensure_ma_dot_column():
         )
         if cursor.fetchone()["cnt"] == 0:
             cursor.execute("ALTER TABLE THIETBI ADD COLUMN MaDot VARCHAR(50) NULL")
+            conn.commit()
+            
+        # Thêm NgayThanhLy
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'THIETBI'
+              AND COLUMN_NAME = 'NgayThanhLy'
+            """
+        )
+        if cursor.fetchone()["cnt"] == 0:
+            cursor.execute("ALTER TABLE THIETBI ADD COLUMN NgayThanhLy DATETIME NULL")
+            conn.commit()
+
+        # Thêm NgayTao
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'THIETBI'
+              AND COLUMN_NAME = 'NgayTao'
+            """
+        )
+        if cursor.fetchone()["cnt"] == 0:
+            cursor.execute("ALTER TABLE THIETBI ADD COLUMN NgayTao DATETIME NULL DEFAULT CURRENT_TIMESTAMP")
+            conn.commit()
+            cursor.execute("UPDATE THIETBI SET NgayTao = COALESCE(NgayMua, CURRENT_TIMESTAMP()) WHERE NgayTao IS NULL")
             conn.commit()
     finally:
         if cursor:
@@ -84,6 +116,7 @@ def map_to_frontend(db_device):
         "MaThietBi": str(db_device["ID_TB"]),
         "TenThietBi": db_device["TenThietBi"],
         "LoaiThietBi": db_device["Loai"],
+        "SeriNumber": db_device.get("SeriNumber") or "",
         "NgayMua": ngay_mua,
         "GiaTri": float(db_device["NguyenGia"]) if db_device["NguyenGia"] is not None else None,
         "TrangThai": normalize_status_for_frontend(db_device["TrangThai"]),
@@ -91,8 +124,9 @@ def map_to_frontend(db_device):
     }
 
 
+
 def get_devices_paginated(page=1, limit=10, search="", batch_id="", employee_id=None):
-    _ensure_ma_dot_column()
+    _ensure_device_columns()
     conn = None
     cursor = None
     try:
@@ -111,9 +145,9 @@ def get_devices_paginated(page=1, limit=10, search="", batch_id="", employee_id=
             params.append(employee_id)
 
         if search:
-            where_clause += " AND (CAST(ID_TB AS CHAR) LIKE %s OR TenThietBi LIKE %s)"
+            where_clause += " AND (CAST(ID_TB AS CHAR) LIKE %s OR TenThietBi LIKE %s OR SeriNumber LIKE %s)"
             keyword = f"%{search}%"
-            params.extend([keyword, keyword])
+            params.extend([keyword, keyword, keyword])
 
         if batch_id:
             where_clause += " AND MaDot = %s"
@@ -150,7 +184,7 @@ def get_devices_paginated(page=1, limit=10, search="", batch_id="", employee_id=
 
 def get_device_batches():
     """Trả về danh sách các mã đợt đã dùng (DISTINCT MaDot)."""
-    _ensure_ma_dot_column()
+    _ensure_device_columns()
     conn = None
     cursor = None
     try:
@@ -191,7 +225,7 @@ def get_device_by_id(matb):
 
 
 def create_device(data):
-    _ensure_ma_dot_column()
+    _ensure_device_columns()
     conn = None
     cursor = None
     try:
@@ -204,17 +238,19 @@ def create_device(data):
         cursor.execute(f"SELECT COALESCE(MAX(ID_TB), 0) + 1 FROM {TABLE_NAME}")
         device_id = cursor.fetchone()[0]
 
+        seri = str(data.get("SeriNumber") or "").strip() or None
         ma_dot = str(data.get("MaDot") or "").strip() or None
 
         cursor.execute(
             f"""
-            INSERT INTO {TABLE_NAME} (ID_TB, TenThietBi, Loai, NgayMua, NguyenGia, TrangThai, MaDot)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO {TABLE_NAME} (ID_TB, TenThietBi, Loai, SeriNumber, NgayMua, NguyenGia, TrangThai, MaDot)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 device_id,
                 data["TenThietBi"],
                 data["LoaiThietBi"],
+                seri,
                 data.get("NgayMua") or None,
                 data.get("GiaTri") or None,
                 normalize_status_for_db(data.get("TrangThai", "SanSang")),
@@ -252,12 +288,15 @@ def update_device(matb, data):
         if cursor.fetchone():
             raise ValueError("Ma thiet bi da duoc dung boi thiet bi khac.")
 
+        seri = str(data.get("SeriNumber") or "").strip() or None
+
         cursor.execute(
             f"""
             UPDATE {TABLE_NAME}
             SET ID_TB = %s,
                 TenThietBi = %s,
                 Loai = %s,
+                SeriNumber = %s,
                 NgayMua = %s,
                 NguyenGia = %s,
                 TrangThai = %s
@@ -267,6 +306,7 @@ def update_device(matb, data):
                 new_device_id,
                 data["TenThietBi"],
                 data["LoaiThietBi"],
+                seri,
                 data.get("NgayMua") or None,
                 data.get("GiaTri") or None,
                 normalize_status_for_db(data["TrangThai"]),
@@ -307,7 +347,7 @@ def soft_delete_device(matb):
         cursor.close()
         cursor = conn.cursor()
         cursor.execute(
-            f"UPDATE {TABLE_NAME} SET TrangThai = %s WHERE ID_TB = %s",
+            f"UPDATE {TABLE_NAME} SET TrangThai = %s, NgayThanhLy = CURRENT_TIMESTAMP WHERE ID_TB = %s",
             ("THANH_LY", matb,),
         )
         conn.commit()

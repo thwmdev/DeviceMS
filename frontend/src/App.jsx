@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Login from "./pages/login"; 
 import AllocationRequests from "./pages/allocationRequests";
 import Devices from "./pages/devices"
+import Inventory from "./pages/inventory"
 import Dashboard from "./pages/dashboard";
 import ProductCategories from "./pages/productCategories";
 import Accounts from "./pages/accounts";
@@ -29,6 +30,7 @@ function App() {
         {/* Dashboard: USER tự động redirect → /devices */}
         <Route path="/dashboard" element={<ProtectedDashboard />} />
         <Route path="/devices" element={<Devices />} />
+        <Route path="/inventory" element={<Inventory/>} />
         <Route path="/allocation-requests" element={<AllocationRequests />} />
         <Route path="/product-categories" element={<ProductCategories />} />
         <Route path="/depreciation" element={<Depreciation />} />

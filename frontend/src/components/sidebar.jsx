@@ -36,6 +36,10 @@ const PERMISSIONS = {
     const normalized = role?.toUpperCase();
     return normalized === "ADMIN" || normalized === "HR";
   },
+  viewInventory: (role) => {
+    const normalized = role?.toUpperCase();
+    return normalized === "ADMIN";
+  },
 };
 
 export default function Sidebar() {
@@ -87,6 +91,15 @@ export default function Sidebar() {
           <i className="ti ti-device-laptop" />
           <span>Quản lý thiết bị</span>
         </li>
+        {user && PERMISSIONS.viewInventory(user.role) && (
+          <li
+            className={`menu-item ${currentPath === "/inventory" ? "active" : ""}`}
+            onClick={() => navigate("/inventory")}
+          >
+            <i className="ti ti-inventory" />
+            <span>Quản lý kho</span>
+          </li>
+        )}
         <li
           className={`menu-item ${currentPath === "/allocation-requests" ? "active" : ""}`}
           onClick={() => navigate("/allocation-requests")}

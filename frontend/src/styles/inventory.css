@@ -1,0 +1,239 @@
+/* Styles bổ sung dành riêng cho phân hệ Quản lý kho */
+
+.inventory-sticky-header {
+  position: sticky;
+  top: 0;
+  background: #f4f1eb;
+  z-index: 90;
+  padding-top: clamp(24px, 4vw, 44px);
+  margin-top: calc(-1 * clamp(24px, 4vw, 44px));
+  padding-bottom: 2px;
+}
+
+.inventory-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid var(--line);
+  margin-bottom: 24px;
+  padding-bottom: 2px;
+}
+
+.inventory-tab-btn {
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink-soft);
+  position: relative;
+  transition: color 0.22s var(--ease);
+}
+
+.inventory-tab-btn:hover {
+  color: var(--accent);
+}
+
+.inventory-tab-btn.active {
+  color: var(--accent-strong);
+}
+
+.inventory-tab-btn.active::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* Modal rộng hơn cho việc thêm hàng loạt */
+.wide-modal {
+  width: min(95%, 1000px) !important;
+}
+
+/* Nhật ký xuất nhập */
+.timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(251, 250, 247, 0.9);
+  border: 1px solid rgba(222, 215, 202, 0.9);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-tight);
+  align-items: flex-start;
+  transition: transform 0.2s;
+}
+
+.timeline-item:hover {
+  transform: translateY(-2px);
+}
+
+.timeline-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: bold;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.timeline-icon.IMPORT {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.timeline-icon.ALLOCATE {
+  background: #fffdf5;
+  color: var(--warning);
+}
+
+.timeline-icon.RETURN {
+  background: #e8f5e9;
+  color: var(--success);
+}
+
+.timeline-icon.DISPOSE {
+  background: #fff1ee;
+  color: var(--danger);
+}
+
+.timeline-content {
+  flex: 1;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.timeline-title {
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--ink);
+}
+
+.timeline-date {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.timeline-body {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.timeline-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+
+.timeline-meta span strong {
+  color: var(--ink-soft);
+}
+
+/* Grid tổng quan */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.stats-card {
+  padding: 20px;
+  background: rgba(251, 250, 247, 0.9);
+  border: 1px solid rgba(222, 215, 202, 0.9);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-tight);
+}
+
+.stats-card-title {
+  font-size: 16px;
+  font-weight: 780;
+  color: var(--accent);
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.stats-card-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.stats-card-row:last-child {
+  margin-bottom: 0;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  font-weight: bold;
+}
+
+.stats-card-row span {
+  color: var(--ink-soft);
+}
+
+.stats-card-row strong {
+  color: var(--ink);
+}
+
+/* Row badge */
+.badge-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.badge-type.IMPORT {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.badge-type.ALLOCATE {
+  background: #fffdf5;
+  color: var(--warning);
+}
+
+.badge-type.RETURN {
+  background: #e8f5e9;
+  color: var(--success);
+}
+
+.badge-type.DISPOSE {
+  background: #fff1ee;
+  color: var(--danger);
+}
+
+/* Detail modal list styling */
+.batch-detail-list {
+  max-height: 350px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fffdfa;
+}
