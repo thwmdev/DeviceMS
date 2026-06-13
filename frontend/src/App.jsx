@@ -29,11 +29,7 @@ function App() {
         {/* Dashboard: USER tự động redirect → /devices */}
         <Route path="/dashboard" element={<ProtectedDashboard />} />
         <Route path="/devices" element={<Devices />} />
-<<<<<<< HEAD
         <Route path="/allocation-requests" element={<AllocationRequests />} />
-=======
-        <Route path="/accounts" element={<Accounts />} />
->>>>>>> b2e7dd6cf233678a99576fd15ad5494b7f4fd84d
         <Route path="/product-categories" element={<ProductCategories />} />
         <Route path="/depreciation" element={<Depreciation />} />
 
