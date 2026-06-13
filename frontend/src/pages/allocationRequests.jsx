@@ -308,55 +308,65 @@ export default function AllocationRequests() {
           <span className="module-count">{total.toLocaleString("vi-VN")} yêu cầu</span>
         </div>
 
-        <div className="search-container">
-          <input
-            type="text"
-            placeholder="Tìm theo mã yêu cầu, nhân viên, thiết bị hoặc lý do..."
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-          />
-          <select
-            className="filter-select"
-            value={typeFilter}
-            onChange={(event) => { setTypeFilter(event.target.value); setPage(1); }}
-          >
-            <option value="">Tất cả loại</option>
-            <option value="CAP_PHAT">Cấp phát</option>
-            <option value="THU_HOI">Thu hồi</option>
-          </select>
-          <select
-            className="filter-select"
-            value={statusFilter}
-            onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="ChoDuyet">Chờ duyệt</option>
-            <option value="DaDuyet">Đã duyệt</option>
-            <option value="TuChoi">Từ chối</option>
-          </select>
-          {batches.length > 0 && (
+        <div className="filter-bar">
+          <div className="filter-bar-left">
+            <div className="search-input-wrap">
+              <svg className="search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="9" cy="9" r="6" stroke="currentColor" strokeWidth="1.8"/>
+                <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+              <input
+                type="text"
+                className="filter-search-input"
+                placeholder="Tìm mã, nhân viên, thiết bị, lý do..."
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+              />
+              {search && (
+                <span className="search-result-badge">{total}</span>
+              )}
+            </div>
+
             <select
               className="filter-select"
-              value={batchFilter}
-              onChange={(event) => { setBatchFilter(event.target.value); setPage(1); }}
+              value={typeFilter}
+              onChange={(event) => { setTypeFilter(event.target.value); setPage(1); }}
             >
-              <option value="">Tất cả đợt</option>
-              {batches.map((b) => (
-                <option key={b} value={b}>{b}</option>
-              ))}
+              <option value="">Tất cả loại</option>
+              <option value="CAP_PHAT">Cấp phát</option>
+              <option value="THU_HOI">Thu hồi</option>
             </select>
-          )}
-          {search && (
-            <span className="search-result-hint">
-              Kết quả cho &quot;{search}&quot;: {total} yêu cầu
-            </span>
-          )}
-        </div>
 
-        <div className="table-toolbar">
-          <button className="btn-primary" onClick={openNewRequest}>
-            + Tạo yêu cầu
-          </button>
+            <select
+              className="filter-select"
+              value={statusFilter}
+              onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}
+            >
+              <option value="">Tất cả trạng thái</option>
+              <option value="ChoDuyet">Chờ duyệt</option>
+              <option value="DaDuyet">Đã duyệt</option>
+              <option value="TuChoi">Từ chối</option>
+            </select>
+
+            {batches.length > 0 && (
+              <select
+                className="filter-select"
+                value={batchFilter}
+                onChange={(event) => { setBatchFilter(event.target.value); setPage(1); }}
+              >
+                <option value="">Tất cả đợt</option>
+                {batches.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="filter-bar-right">
+            <button className="btn-primary" onClick={openNewRequest}>
+              + Tạo yêu cầu
+            </button>
+          </div>
         </div>
 
         <table className="device-table allocation-table">
