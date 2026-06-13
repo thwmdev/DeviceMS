@@ -40,7 +40,6 @@ const Login = () => {
         }
         localStorage.setItem("username", response.data.username || username);
 
-        alert("Đăng nhập thành công!");
         window.location.href = "/dashboard"; 
       }
     } catch (err) {
@@ -57,10 +56,7 @@ const Login = () => {
   return (
     <div className="login-container">
       <form onSubmit={handleLogin} className="login-form">
-        <p className="login-eyebrow">DeviceMS</p>
         <h2 className="login-title">Đăng nhập</h2>
-        <p className="login-subtitle">Quản lý thiết bị nội bộ với giao diện gọn, rõ và bảo mật.</p>
-
 
         {error && <div className="login-error-alert">{error}</div>}
 

@@ -101,10 +101,6 @@ const Dashboard = () => {
         <section className="dashboard-hero">
           <div>
             <p className="dashboard-kicker">Tổng quan tài sản</p>
-            <h1>Tổng quan DeviceMS</h1>
-            <p className="dashboard-subtitle">
-              Theo dõi tồn kho, cấp phát và giá trị thiết bị trong một màn hình.
-            </p>
           </div>
           <button className="btn-primary" onClick={() => navigate("/devices")}>
             Mở quản lý thiết bị
