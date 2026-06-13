@@ -57,16 +57,27 @@ def login():
 
     conn.close()
 
+    raw_role = user.get("VaiTro", "")
+    role_upper = raw_role.upper()
+    if "NHANVIEN" in role_upper or "NHÂN VIÊN" in role_upper or "NHAN VIEN" in role_upper or "USER" in role_upper:
+        mapped_role = "USER"
+    elif "ADMIN" in role_upper:
+        mapped_role = "ADMIN"
+    elif "HR" in role_upper:
+        mapped_role = "HR"
+    else:
+        mapped_role = raw_role
+
     payload = {
         "username": user["TenDangNhap"],
-        "role": user.get("VaiTro"),
+        "role": mapped_role,
         "id_nv": user.get("ID_NV"),
     }
 
     return jsonify({
         "token": encode_token(payload),
         "username": user["TenDangNhap"],
-        "role": user.get("VaiTro"),
+        "role": mapped_role,
         "id_nv": user.get("ID_NV"),
         "message": "Đăng nhập thành công"
     })

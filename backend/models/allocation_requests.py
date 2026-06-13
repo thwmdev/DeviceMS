@@ -329,7 +329,7 @@ def get_allocation_options(employee_id=None):
             conn.close()
 
 
-def get_requests_paginated(page=1, limit=10, search="", request_type="", status="", batch_id=""):
+def get_requests_paginated(page=1, limit=10, search="", request_type="", status="", batch_id="", employee_id=None):
     ensure_allocation_tables()
     conn = None
     cursor = None
@@ -368,6 +368,10 @@ def get_requests_paginated(page=1, limit=10, search="", request_type="", status=
         if batch_id:
             where_parts.append("y.MaDot = %s")
             params.append(batch_id)
+
+        if employee_id:
+            where_parts.append("y.ID_NV = %s")
+            params.append(employee_id)
 
         where_clause = " AND ".join(where_parts)
 

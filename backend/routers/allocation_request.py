@@ -41,6 +41,17 @@ def list_allocation_requests():
         request_type = request.args.get("type", "").strip()
         status = request.args.get("status", "").strip()
         batch_id = request.args.get("batch_id", "").strip()
+        claims = getattr(request, "user_claims", {}) or {}
+        user_role = claims.get("role", "").upper()
+        employee_id = None
+        if user_role == "USER":
+            raw_id = claims.get("employee_id") or claims.get("id_nv")
+            if raw_id:
+                try:
+                    employee_id = int(raw_id)
+                except (TypeError, ValueError):
+                    pass
+
         result = get_requests_paginated(
             page=page,
             limit=limit,
@@ -48,6 +59,7 @@ def list_allocation_requests():
             request_type=request_type,
             status=status,
             batch_id=batch_id,
+            employee_id=employee_id,
         )
         return jsonify(result), 200
     except ValueError as e:

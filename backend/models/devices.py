@@ -91,7 +91,7 @@ def map_to_frontend(db_device):
     }
 
 
-def get_devices_paginated(page=1, limit=10, search="", batch_id=""):
+def get_devices_paginated(page=1, limit=10, search="", batch_id="", employee_id=None):
     _ensure_ma_dot_column()
     conn = None
     cursor = None
@@ -105,6 +105,10 @@ def get_devices_paginated(page=1, limit=10, search="", batch_id=""):
 
         where_clause = "WHERE 1 = 1"
         params = []
+
+        if employee_id:
+            where_clause += " AND ID_TB IN (SELECT ID_TB FROM LICHSUCAPPHAT WHERE ID_NV = %s AND (TrangThai IS NULL OR TrangThai NOT IN ('DaThuHoi', 'ThuHoi')))"
+            params.append(employee_id)
 
         if search:
             where_clause += " AND (CAST(ID_TB AS CHAR) LIKE %s OR TenThietBi LIKE %s)"
