@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from models.depre import get_depreciation_detail, get_depreciation_report, save_depreciation, caculate_depre
 from security.roles import token_and_role_required
-
+from database.db import get_connection
 
 
 depre_bp = Blueprint("depreciation", __name__)
@@ -45,3 +45,21 @@ def get_depreciation_config(ma_tb):
 def get_report():
     data = get_depreciation_report() 
     return jsonify(data), 200
+
+
+
+@token_and_role_required(allowed_roles=["ADMIN"])
+def get_depreciation_history(ma_tb):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        
+        query = "SELECT Thang, Nam, SoTien, NgayChot FROM LICHSUKHAUHAO WHERE MaTB = %s ORDER BY Nam DESC, Thang DESC"
+        cursor.execute(query, (ma_tb,))
+        history = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return jsonify(history), 200
+    except Exception as e:
+        return jsonify({"message": f"Lỗi truy vấn lịch sử: {str(e)}"}), 500

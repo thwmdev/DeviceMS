@@ -91,3 +91,20 @@ select:focus, input:focus {
     border: 1px solid #ccc;
     border-radius: 4px;
 }
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.history-table th, .history-table td {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+}
+
+.history-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
