@@ -530,6 +530,9 @@ export default function ProductCategories() {
                   <select
                     value={editForm.TrangThai}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, TrangThai: e.target.value }))}
+                    disabled
+                    style={{ backgroundColor: "var(--bg-light)", cursor: "not-allowed", opacity: 0.8 }}
+                    title="Trạng thái chỉ có thể thay đổi bằng nút Tạm dừng/Kích hoạt ở bảng danh sách."
                   >
                     <option value="HoatDong">Hoạt động</option>
                     <option value="TamDung">Tạm dừng</option>

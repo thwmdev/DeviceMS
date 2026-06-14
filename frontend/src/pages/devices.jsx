@@ -491,17 +491,20 @@ export default function Devices() {
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Trạng thái</label>
-                  <select
-                    value={editForm.TrangThai}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, TrangThai: e.target.value }))}
-                  >
-                    <option value="SAN_SANG">Sẵn sàng</option>
-                    <option value="DA_CAP_PHAT">Đã cấp phát</option>
-                    <option value="THANH_LY">Thanh lý</option>
-                  </select>
-                </div>
+                  <div className="form-group">
+                    <label>Trạng thái</label>
+                    <select
+                      value={editForm.TrangThai}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, TrangThai: e.target.value }))}
+                      disabled
+                      style={{ backgroundColor: "var(--bg-light)", cursor: "not-allowed", opacity: 0.8 }}
+                      title="Không thể sửa trạng thái trực tiếp. Vui lòng dùng chức năng Cấp phát, Thu hồi hoặc Thanh lý."
+                    >
+                      <option value="SAN_SANG">Sẵn sàng</option>
+                      <option value="DA_CAP_PHAT">Đã cấp phát</option>
+                      <option value="THANH_LY">Thanh lý</option>
+                    </select>
+                  </div>
               </div>
 
               <div className="device-modal-footer">
