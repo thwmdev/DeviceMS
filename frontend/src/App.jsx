@@ -10,10 +10,9 @@ import Accounts from "./pages/accounts";
 import Depreciation from "./pages/depreciation";
 
 
-// Guard: USER truy cập /dashboard sẽ bị redirect về /devices
 function ProtectedDashboard() {
   const role = (localStorage.getItem("role") || "").toUpperCase();
-  if (role === "USER") return <Navigate to="/devices" replace />;
+  if (role === "ADMIN") return <Navigate to="/devices" replace />;
   return <Dashboard />;
 }
 
@@ -27,12 +26,12 @@ function App() {
         
 
         <Route path="/login" element={<Login />} />
-        {/* Dashboard: USER tự động redirect → /devices */}
         <Route path="/dashboard" element={<ProtectedDashboard />} />
         <Route path="/devices" element={<Devices />} />
         <Route path="/inventory" element={<Inventory/>} />
         <Route path="/allocation-requests" element={<AllocationRequests />} />
         <Route path="/product-categories" element={<ProductCategories />} />
+        <Route path="/accounts" element={<Accounts />} />
         <Route path="/depreciation" element={<Depreciation />} />
 
 
