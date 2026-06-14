@@ -48,6 +48,8 @@ export default function Devices() {
   // Batch filter
   const [batches, setBatches] = useState([]);
   const [batchFilter, setBatchFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   // Categories
   const [categories, setCategories] = useState([]);
@@ -158,10 +160,28 @@ export default function Devices() {
 
   useEffect(() => { loadDevices(); }, [loadDevices]);
 
-  const tableRows = useMemo(() => devices.map((device) => ({
-    ...device,
-    TrangThaiText: STATUS_LABEL[device.TrangThai] || device.TrangThai,
-  })), [devices]);
+  const tableRows = useMemo(() => {
+    let result = devices.map((device) => ({
+      ...device,
+      TrangThaiText: STATUS_LABEL[device.TrangThai] || device.TrangThai,
+    }));
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      result = result.filter(d => 
+        (d.MaThietBi || "").toLowerCase().includes(lowerSearch) ||
+        (d.TenThietBi || "").toLowerCase().includes(lowerSearch) ||
+        (d.SeriNumber || "").toLowerCase().includes(lowerSearch) ||
+        (d.LoaiThietBi || "").toLowerCase().includes(lowerSearch)
+      );
+    }
+    if (categoryFilter) {
+      result = result.filter(d => d.LoaiThietBi === categoryFilter);
+    }
+    if (statusFilter) {
+      result = result.filter(d => d.TrangThai === statusFilter);
+    }
+    return result;
+  }, [devices, search, categoryFilter, statusFilter]);
 
   const sortedDevices = useMemo(
     () => sortRows(tableRows, sortConfig),
@@ -287,6 +307,26 @@ export default function Devices() {
               ))}
             </select>
           )}
+          <select
+            className="filter-select"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
+            <option value="">Tất cả danh mục</option>
+            {categories.map((c) => (
+              <option key={c.ID_DM} value={c.TenDanhMuc}>{c.TenDanhMuc}</option>
+            ))}
+          </select>
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="SAN_SANG">Sẵn sàng</option>
+            <option value="DA_CAP_PHAT">Đã cấp phát</option>
+            <option value="THANH_LY">Thanh lý</option>
+          </select>
           {search && (
             <span className="search-result-hint">
               Kết quả cho &quot;{search}&quot;: {total} thiết bị
