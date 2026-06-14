@@ -61,6 +61,7 @@ export default function ProductCategories() {
   // Batch filter
   const [batches, setBatches] = useState([]);
   const [batchFilter, setBatchFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   // Batch create modal
   const [openBatchModal, setOpenBatchModal] = useState(false);
@@ -128,10 +129,23 @@ export default function ProductCategories() {
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
 
-  const tableRows = useMemo(() => categories.map((category) => ({
-    ...category,
-    TrangThaiText: STATUS_LABEL[category.TrangThai] || category.TrangThai,
-  })), [categories]);
+  const tableRows = useMemo(() => {
+    let result = categories.map((category) => ({
+      ...category,
+      TrangThaiText: STATUS_LABEL[category.TrangThai] || category.TrangThai,
+    }));
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      result = result.filter(c => 
+        (c.TenDanhMuc || "").toLowerCase().includes(lowerSearch) ||
+        (c.MaDanhMuc || "").toLowerCase().includes(lowerSearch)
+      );
+    }
+    if (statusFilter) {
+      result = result.filter(c => c.TrangThai === statusFilter);
+    }
+    return result;
+  }, [categories, search, statusFilter]);
 
   const sortedCategories = useMemo(
     () => sortRows(tableRows, sortConfig),
@@ -287,6 +301,15 @@ export default function ProductCategories() {
               ))}
             </select>
           )}
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="HoatDong">Hoạt động</option>
+            <option value="TamDung">Tạm dừng</option>
+          </select>
           {search && (
             <span className="search-result-hint">
               Kết quả cho &quot;{search}&quot;: {total} danh mục

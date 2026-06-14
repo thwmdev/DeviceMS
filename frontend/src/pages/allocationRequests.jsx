@@ -174,13 +174,31 @@ export default function AllocationRequests() {
 
   useEffect(() => { loadRequests(); }, [loadRequests]);
 
-  const tableRows = useMemo(() => requests.map((item) => ({
-    ...item,
-    NhanVienText: item.HoTen ? `${item.HoTen} (#${item.ID_NV})` : `#${item.ID_NV}`,
-    ThietBiText: item.TenThietBi ? `${item.TenThietBi} (#${item.ID_TB})` : `#${item.ID_TB || "-"}`,
-    LoaiText: REQUEST_TYPE_LABEL[item.LoaiYeuCau] || item.LoaiYeuCau,
-    TrangThaiText: STATUS_LABEL[item.TrangThaiDuyet] || item.TrangThaiDuyet,
-  })), [requests]);
+  const tableRows = useMemo(() => {
+    let result = requests.map((item) => ({
+      ...item,
+      NhanVienText: item.HoTen ? `${item.HoTen} (#${item.ID_NV})` : `#${item.ID_NV}`,
+      ThietBiText: item.TenThietBi ? `${item.TenThietBi} (#${item.ID_TB})` : `#${item.ID_TB || "-"}`,
+      LoaiText: REQUEST_TYPE_LABEL[item.LoaiYeuCau] || item.LoaiYeuCau,
+      TrangThaiText: STATUS_LABEL[item.TrangThaiDuyet] || item.TrangThaiDuyet,
+    }));
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      result = result.filter(r => 
+        (r.HoTen || "").toLowerCase().includes(lowerSearch) ||
+        (r.TenThietBi || "").toLowerCase().includes(lowerSearch) ||
+        (r.LyDo || "").toLowerCase().includes(lowerSearch) ||
+        String(r.ID_YC).includes(lowerSearch)
+      );
+    }
+    if (typeFilter) {
+      result = result.filter(r => r.LoaiYeuCau === typeFilter);
+    }
+    if (statusFilter) {
+      result = result.filter(r => r.TrangThaiDuyet === statusFilter);
+    }
+    return result;
+  }, [requests, search, typeFilter, statusFilter]);
 
   const sortedRequests = useMemo(() => sortRows(tableRows, sortConfig), [tableRows, sortConfig]);
 

@@ -4,6 +4,8 @@ import axios from "axios";
 import * as XLSX from "xlsx";
 import Sidebar from "../components/sidebar";
 import Pagination from "../components/Pagination";
+import SortableHeader from "../components/SortableHeader";
+import { getNextSort, sortRows } from "../utils/tableSort";
 import "../index.css";
 import "../App.css";
 import "../styles/inventory.css";
@@ -64,13 +66,32 @@ export default function Inventory() {
   const [currentPageBatches, setCurrentPageBatches] = useState(1);
   const [currentPageDisposeBatches, setCurrentPageDisposeBatches] = useState(1);
   const [currentPageHistory, setCurrentPageHistory] = useState(1);
+  const [currentPageCategories, setCurrentPageCategories] = useState(1);
+  const [currentPageModels, setCurrentPageModels] = useState(1);
   const itemsPerPage = 10;
+
+  // Sorting states
+  const [sortCategories, setSortCategories] = useState({ key: "category", direction: "asc" });
+  const [sortModels, setSortModels] = useState({ key: "modelName", direction: "asc" });
+  const [sortBatches, setSortBatches] = useState({ key: "date", direction: "desc" });
+  const [sortDisposeBatches, setSortDisposeBatches] = useState({ key: "date", direction: "desc" });
+  const [sortHistory, setSortHistory] = useState({ key: "NgayThucHien", direction: "desc" });
 
   // Search states
   const [searchCategory, setSearchCategory] = useState("");
   const [searchModel, setSearchModel] = useState("");
+  const [searchBatch, setSearchBatch] = useState("");
   const [searchDisposeBatch, setSearchDisposeBatch] = useState("");
+  const [searchHistory, setSearchHistory] = useState("");
   const [searchDisposeModal, setSearchDisposeModal] = useState("");
+
+  // New states for missing table features
+  const [currentPageBatchDetail, setCurrentPageBatchDetail] = useState(1);
+  const [sortBatchDetail, setSortBatchDetail] = useState({ key: "MaThietBi", direction: "asc" });
+  const [searchBatchDetail, setSearchBatchDetail] = useState("");
+  const [modelsCategoryFilter, setModelsCategoryFilter] = useState("");
+  const [batchDetailCategoryFilter, setBatchDetailCategoryFilter] = useState("");
+  const [batchDetailStatusFilter, setBatchDetailStatusFilter] = useState("");
 
   // Data
   const [stats, setStats] = useState({ categories: [], models: [] });
@@ -185,42 +206,82 @@ export default function Inventory() {
     if (tabName === "batches") { setCurrentPageBatches(1); loadBatches(); }
     else if (tabName === "dispose_batches") { setCurrentPageDisposeBatches(1); loadDisposeBatches(); }
     else if (tabName === "history") { setCurrentPageHistory(1); loadHistory(); }
-    else if (tabName === "overview") loadStats();
+    else if (tabName === "overview") { 
+      setCurrentPageCategories(1);
+      setCurrentPageModels(1);
+      loadStats();
+    }
   };
 
-  const totalBatchPages = Math.ceil(batches.length / itemsPerPage) || 1;
-  const currentBatches = batches.slice((currentPageBatches - 1) * itemsPerPage, currentPageBatches * itemsPerPage);
-
-  // Filtered Overview Data
+  // Sắp xếp & phân trang Tồn kho danh mục
   const filteredCategories = useMemo(() => {
     if (!stats.categories) return [];
-    return stats.categories.filter((item) => 
+    let list = stats.categories.filter((item) => 
       item.category.toLowerCase().includes(searchCategory.toLowerCase())
     );
-  }, [stats.categories, searchCategory]);
+    return sortRows(list, sortCategories);
+  }, [stats.categories, searchCategory, sortCategories]);
 
+  const totalCategoryPages = Math.ceil(filteredCategories.length / itemsPerPage) || 1;
+  const currentCategories = filteredCategories.slice((currentPageCategories - 1) * itemsPerPage, currentPageCategories * itemsPerPage);
+
+  // Sắp xếp & phân trang Tồn kho theo dòng máy
   const filteredModels = useMemo(() => {
     if (!stats.models) return [];
-    return stats.models.filter((item) => 
+    let list = stats.models.filter((item) => 
       item.modelName.toLowerCase().includes(searchModel.toLowerCase()) ||
       item.category.toLowerCase().includes(searchModel.toLowerCase())
     );
-  }, [stats.models, searchModel]);
+    if (modelsCategoryFilter) {
+      list = list.filter(item => item.category === modelsCategoryFilter);
+    }
+    return sortRows(list, sortModels);
+  }, [stats.models, searchModel, modelsCategoryFilter, sortModels]);
 
-  // Filtered Dispose Batches
+  const totalModelPages = Math.ceil(filteredModels.length / itemsPerPage) || 1;
+  const currentModels = filteredModels.slice((currentPageModels - 1) * itemsPerPage, currentPageModels * itemsPerPage);
+
+  // Lịch sử nhập
+  const filteredBatches = useMemo(() => {
+    let list = batches.filter((b) => 
+      b.batchId.toLowerCase().includes(searchBatch.toLowerCase()) ||
+      (b.date && new Date(b.date).toLocaleDateString("vi-VN").includes(searchBatch))
+    );
+    return sortRows(list, sortBatches);
+  }, [batches, searchBatch, sortBatches]);
+
+  const totalBatchPages = Math.ceil(filteredBatches.length / itemsPerPage) || 1;
+  const currentBatches = filteredBatches.slice((currentPageBatches - 1) * itemsPerPage, currentPageBatches * itemsPerPage);
+
+  // Lịch sử thanh lý
   const filteredDisposeBatches = useMemo(() => {
-    return disposeBatches.filter((b) => 
+    let list = disposeBatches.filter((b) => 
       b.batchId.toLowerCase().includes(searchDisposeBatch.toLowerCase()) ||
       (b.date && new Date(b.date).toLocaleDateString("vi-VN").includes(searchDisposeBatch))
     );
-  }, [disposeBatches, searchDisposeBatch]);
+    return sortRows(list, sortDisposeBatches);
+  }, [disposeBatches, searchDisposeBatch, sortDisposeBatches]);
 
   const totalDisposeBatchPages = Math.ceil(filteredDisposeBatches.length / itemsPerPage) || 1;
   const currentDisposeBatches = filteredDisposeBatches.slice((currentPageDisposeBatches - 1) * itemsPerPage, currentPageDisposeBatches * itemsPerPage);
 
-
-  const totalHistoryPages = Math.ceil(history.length / itemsPerPage) || 1;
-  const currentHistory = history.slice((currentPageHistory - 1) * itemsPerPage, currentPageHistory * itemsPerPage);
+  // Lịch sử hoạt động kho
+  const filteredHistory = useMemo(() => {
+    if (!history) return [];
+    let list = history;
+    if (searchHistory) {
+      const lowerSearch = searchHistory.toLowerCase();
+      list = list.filter(h => 
+        (h.action || "").toLowerCase().includes(lowerSearch) ||
+        (h.performer || "").toLowerCase().includes(lowerSearch) ||
+        (h.details || "").toLowerCase().includes(lowerSearch)
+      );
+    }
+    return sortRows(list, sortHistory);
+  }, [history, searchHistory, sortHistory]);
+  
+  const totalHistoryPages = Math.ceil(filteredHistory.length / itemsPerPage) || 1;
+  const currentHistory = filteredHistory.slice((currentPageHistory - 1) * itemsPerPage, currentPageHistory * itemsPerPage);
 
   // ── Nhập kho Modal (Batch Input / Excel) ──────────────────────────
   const openImport = () => {
@@ -538,21 +599,39 @@ export default function Inventory() {
                   <table className="device-table" style={{ margin: 0 }}>
                     <thead>
                       <tr>
-                        <th>Loại thiết bị</th>
-                        <th>Tổng tồn kho</th>
-                        <th>Sẵn sàng cấp</th>
-                        <th>Đang cấp phát</th>
-                        <th>Đã thanh lý</th>
-                        <th>Tổng trị giá phân khu</th>
+                        <th>
+                          <SortableHeader label="Loại thiết bị" sortKey="category" sortConfig={sortCategories}
+                            onSort={(key) => setSortCategories((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Tổng tồn kho" sortKey="total" sortConfig={sortCategories}
+                            onSort={(key) => setSortCategories((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Sẵn sàng cấp" sortKey="available" sortConfig={sortCategories}
+                            onSort={(key) => setSortCategories((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Đang cấp phát" sortKey="assigned" sortConfig={sortCategories}
+                            onSort={(key) => setSortCategories((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Đã thanh lý" sortKey="disposed" sortConfig={sortCategories}
+                            onSort={(key) => setSortCategories((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Tổng trị giá phân khu" sortKey="value" sortConfig={sortCategories}
+                            onSort={(key) => setSortCategories((curr) => getNextSort(curr, key))} />
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredCategories.length === 0 ? (
+                      {currentCategories.length === 0 ? (
                         <tr>
                           <td colSpan="6">Không có dữ liệu</td>
                         </tr>
                       ) : (
-                        filteredCategories.map((item) => (
+                        currentCategories.map((item) => (
                           <tr key={item.category}>
                             <td><strong>{item.category}</strong></td>
                             <td>{item.total} chiếc</td>
@@ -565,10 +644,15 @@ export default function Inventory() {
                       )}
                     </tbody>
                   </table>
+                  <Pagination 
+                    currentPage={currentPageCategories} 
+                    totalPages={totalCategoryPages} 
+                    onPageChange={setCurrentPageCategories} 
+                  />
                 </div>
 
                 {/* 2. Model stats table */}
-                <div>
+                <div style={{ marginTop: "24px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                     <h2 style={{ fontSize: "16px", fontWeight: "760", color: "var(--accent)" }}>
                       Thống kê chi tiết theo Dòng thiết bị (Model)
@@ -585,22 +669,43 @@ export default function Inventory() {
                   <table className="device-table" style={{ margin: 0 }}>
                     <thead>
                       <tr>
-                        <th>Tên dòng máy (Model)</th>
-                        <th>Loại thiết bị</th>
-                        <th>Tổng số lượng</th>
-                        <th>Sẵn sàng cấp</th>
-                        <th>Đang cấp phát</th>
-                        <th>Đã thanh lý</th>
-                        <th>Tổng giá trị</th>
+                        <th>
+                          <SortableHeader label="Tên dòng máy" sortKey="modelName" sortConfig={sortModels}
+                            onSort={(key) => setSortModels((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Loại thiết bị" sortKey="category" sortConfig={sortModels}
+                            onSort={(key) => setSortModels((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Tổng số lượng" sortKey="total" sortConfig={sortModels}
+                            onSort={(key) => setSortModels((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Sẵn sàng cấp" sortKey="available" sortConfig={sortModels}
+                            onSort={(key) => setSortModels((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Đang cấp phát" sortKey="assigned" sortConfig={sortModels}
+                            onSort={(key) => setSortModels((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Đã thanh lý" sortKey="disposed" sortConfig={sortModels}
+                            onSort={(key) => setSortModels((curr) => getNextSort(curr, key))} />
+                        </th>
+                        <th>
+                          <SortableHeader label="Tổng giá trị" sortKey="value" sortConfig={sortModels}
+                            onSort={(key) => setSortModels((curr) => getNextSort(curr, key))} />
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredModels.length === 0 ? (
+                      {currentModels.length === 0 ? (
                         <tr>
                           <td colSpan="7">Không có dữ liệu</td>
                         </tr>
                       ) : (
-                        filteredModels.map((item, idx) => (
+                        currentModels.map((item, idx) => (
                           <tr key={idx}>
                             <td><strong>{item.modelName}</strong></td>
                             <td>{item.category}</td>
@@ -614,6 +719,11 @@ export default function Inventory() {
                       )}
                     </tbody>
                   </table>
+                  <Pagination 
+                    currentPage={currentPageModels} 
+                    totalPages={totalModelPages} 
+                    onPageChange={setCurrentPageModels} 
+                  />
                 </div>
               </>
             )}
@@ -623,15 +733,46 @@ export default function Inventory() {
         {/* Tab 2: Batches */}
         {activeTab === "batches" && (
           <div className="table-container">
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Tìm kiếm mã đợt hoặc ngày nhập..."
+                value={searchBatch}
+                onChange={(e) => {
+                  setSearchBatch(e.target.value);
+                  setCurrentPageBatches(1);
+                }}
+                style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px", width: "300px" }}
+              />
+            </div>
             <table className="device-table">
               <thead>
                 <tr>
-                  <th>Mã đợt nhập</th>
-                  <th>Ngày nhập</th>
-                  <th>Tổng thiết bị</th>
-                  <th>Sẵn có (ở kho)</th>
-                  <th>Đã thanh lý</th>
-                  <th>Tổng nguyên giá trị đợt</th>
+                  <th>
+                    <SortableHeader label="Mã đợt nhập" sortKey="batchId" sortConfig={sortBatches}
+                      onSort={(key) => setSortBatches((curr) => getNextSort(curr, key))} />
+                  </th>
+                  <th>
+                    <SortableHeader label="Ngày nhập" sortKey="date" sortConfig={sortBatches}
+                      onSort={(key) => setSortBatches((curr) => getNextSort(curr, key))} />
+                  </th>
+                  <th>
+                    <SortableHeader label="Tổng thiết bị" sortKey="totalDevices" sortConfig={sortBatches}
+                      onSort={(key) => setSortBatches((curr) => getNextSort(curr, key))} />
+                  </th>
+                  <th>
+                    <SortableHeader label="Sẵn có (ở kho)" sortKey="availableDevices" sortConfig={sortBatches}
+                      onSort={(key) => setSortBatches((curr) => getNextSort(curr, key))} />
+                  </th>
+                  <th>
+                    <SortableHeader label="Đã thanh lý" sortKey="disposedDevices" sortConfig={sortBatches}
+                      onSort={(key) => setSortBatches((curr) => getNextSort(curr, key))} />
+                  </th>
+                  <th>
+                    <SortableHeader label="Tổng nguyên giá trị đợt" sortKey="totalValue" sortConfig={sortBatches}
+                      onSort={(key) => setSortBatches((curr) => getNextSort(curr, key))} />
+                  </th>
                   <th style={{ textAlign: "center" }}>Hành động</th>
                 </tr>
               </thead>
@@ -698,10 +839,22 @@ export default function Inventory() {
             <table className="device-table">
               <thead>
                 <tr>
-                  <th>Mã đợt thanh lý</th>
-                  <th>Ngày thanh lý</th>
-                  <th>Tổng thiết bị</th>
-                  <th>Tổng nguyên giá trị đợt</th>
+                  <th>
+                    <SortableHeader label="Mã đợt thanh lý" sortKey="batchId" sortConfig={sortDisposeBatches}
+                      onSort={(key) => setSortDisposeBatches((curr) => getNextSort(curr, key))} />
+                  </th>
+                  <th>
+                    <SortableHeader label="Ngày thanh lý" sortKey="date" sortConfig={sortDisposeBatches}
+                      onSort={(key) => setSortDisposeBatches((curr) => getNextSort(curr, key))} />
+                  </th>
+                  <th>
+                    <SortableHeader label="Tổng thiết bị" sortKey="total" sortConfig={sortDisposeBatches}
+                      onSort={(key) => setSortDisposeBatches((curr) => getNextSort(curr, key))} />
+                  </th>
+                  <th>
+                    <SortableHeader label="Tổng nguyên giá trị đợt" sortKey="value" sortConfig={sortDisposeBatches}
+                      onSort={(key) => setSortDisposeBatches((curr) => getNextSort(curr, key))} />
+                  </th>
                   <th style={{ textAlign: "center" }}>Hành động</th>
                 </tr>
               </thead>
@@ -1069,34 +1222,95 @@ export default function Inventory() {
                   <p>Không tìm thấy thiết bị nào thuộc đợt nhập này.</p>
                 ) : (
                   <div className="batch-detail-list">
+                    <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
+                      <input
+                        type="text"
+                        className="search-input"
+                        placeholder="Tìm theo mã, tên thiết bị, số seri..."
+                        value={searchBatchDetail}
+                        onChange={(event) => setSearchBatchDetail(event.target.value)}
+                        style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px", flex: 1 }}
+                      />
+                      <select
+                        className="filter-select"
+                        value={batchDetailCategoryFilter}
+                        onChange={(e) => setBatchDetailCategoryFilter(e.target.value)}
+                        style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px" }}
+                      >
+                        <option value="">Tất cả danh mục</option>
+                        {categories.map((c) => (
+                          <option key={c.ID_DM} value={c.TenDanhMuc}>{c.TenDanhMuc}</option>
+                        ))}
+                      </select>
+                      <select
+                        className="filter-select"
+                        value={batchDetailStatusFilter}
+                        onChange={(e) => setBatchDetailStatusFilter(e.target.value)}
+                        style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px" }}
+                      >
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="SAN_SANG">Sẵn sàng</option>
+                        <option value="DA_CAP_PHAT">Đã cấp phát</option>
+                        <option value="THANH_LY">Thanh lý</option>
+                      </select>
+                    </div>
+
                     <table className="device-table" style={{ margin: 0 }}>
                       <thead>
                         <tr>
-                          <th>Mã thiết bị</th>
-                          <th>Tên thiết bị</th>
-                          <th>Số Seri</th>
-                          <th>Loại</th>
-                          <th>Nguyên giá</th>
-                          <th>Trạng thái</th>
+                          <th>
+                            <SortableHeader label="Mã thiết bị" sortKey="MaThietBi" sortConfig={sortBatchDetail} onSort={(key) => setSortBatchDetail((curr) => getNextSort(curr, key))} />
+                          </th>
+                          <th>
+                            <SortableHeader label="Tên thiết bị" sortKey="TenThietBi" sortConfig={sortBatchDetail} onSort={(key) => setSortBatchDetail((curr) => getNextSort(curr, key))} />
+                          </th>
+                          <th>
+                            <SortableHeader label="Số Seri" sortKey="SeriNumber" sortConfig={sortBatchDetail} onSort={(key) => setSortBatchDetail((curr) => getNextSort(curr, key))} />
+                          </th>
+                          <th>
+                            <SortableHeader label="Loại" sortKey="LoaiThietBi" sortConfig={sortBatchDetail} onSort={(key) => setSortBatchDetail((curr) => getNextSort(curr, key))} />
+                          </th>
+                          <th>
+                            <SortableHeader label="Nguyên giá" sortKey="GiaTri" sortConfig={sortBatchDetail} onSort={(key) => setSortBatchDetail((curr) => getNextSort(curr, key))} />
+                          </th>
+                          <th>
+                            <SortableHeader label="Trạng thái" sortKey="TrangThai" sortConfig={sortBatchDetail} onSort={(key) => setSortBatchDetail((curr) => getNextSort(curr, key))} />
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {batchDevices.map((dev) => (
-                          <tr key={dev.MaTB}>
-                            <td>{dev.MaThietBi}</td>
-                            <td><strong>{dev.TenThietBi}</strong></td>
-                            <td><code>{dev.SeriNumber || "-"}</code></td>
-                            <td>{dev.LoaiThietBi}</td>
-                            <td>{dev.GiaTri ? `${dev.GiaTri.toLocaleString("vi-VN")} ₫` : "-"}</td>
-                            <td>
-                              <span className={`status-badge status-${dev.TrangThai}`}>
-                                {dev.TrangThai === "SAN_SANG" ? "Sẵn sàng" : dev.TrangThai === "DA_CAP_PHAT" ? "Đã cấp phát" : "Thanh lý"}
-                              </span>
-                            </td>
+                        {currentBatchDetail.length === 0 ? (
+                          <tr>
+                            <td colSpan="6" style={{ textAlign: "center", padding: "16px" }}>Không tìm thấy kết quả phù hợp.</td>
                           </tr>
-                        ))}
+                        ) : (
+                          currentBatchDetail.map((dev) => (
+                            <tr key={dev.MaTB}>
+                              <td>{dev.MaThietBi}</td>
+                              <td><strong>{dev.TenThietBi}</strong></td>
+                              <td><code>{dev.SeriNumber || "-"}</code></td>
+                              <td>{dev.LoaiThietBi}</td>
+                              <td>{dev.GiaTri ? `${dev.GiaTri.toLocaleString("vi-VN")} ₫` : "-"}</td>
+                              <td>
+                                <span className={`status-badge status-${dev.TrangThai}`}>
+                                  {dev.TrangThai === "SAN_SANG" ? "Sẵn sàng" : dev.TrangThai === "DA_CAP_PHAT" ? "Đã cấp phát" : "Thanh lý"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
+                    
+                    {totalBatchDetailPages > 1 && (
+                      <div style={{ marginTop: "16px" }}>
+                        <Pagination 
+                          currentPage={currentPageBatchDetail} 
+                          totalPages={totalBatchDetailPages} 
+                          onPageChange={setCurrentPageBatchDetail} 
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
