@@ -3,6 +3,7 @@ from models.inventory import (
     get_inventory_stats,
     get_inventory_batches,
     get_inventory_transactions,
+    get_disposal_batches,
 )
 from security.roles import token_and_role_required
 
@@ -37,3 +38,13 @@ def get_transactions():
         return jsonify({"transactions": txs}), 200
     except Exception as e:
         return jsonify({"message": str(e)}), 500
+
+@inventory_bp.route("/disposal-batches", methods=["GET"])
+@token_and_role_required(allowed_roles=ALLOWED_ROLES)
+def get_disposal_batches_route():
+    try:
+        batches = get_disposal_batches()
+        return jsonify({"batches": batches}), 200
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500
+

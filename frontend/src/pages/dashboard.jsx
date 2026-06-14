@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import "../App.css";
 import Sidebar from "../components/sidebar";
 
 const API_URL = "http://127.0.0.1:5000/api/device";
+const ALLOCATION_API_URL = "http://127.0.0.1:5000/api/allocation-request";
 
 const STATUS_LABEL = {
   SAN_SANG: "Sẵn sàng",
@@ -27,6 +29,7 @@ const formatMoney = (value) => {
 const Dashboard = () => {
   const navigate = useNavigate();
   const [devices, setDevices] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -46,11 +49,15 @@ const Dashboard = () => {
     try {
       setLoading(true);
       setError("");
-      const res = await axios.get(`${API_URL}/list?page=1&limit=100`, {
-        headers: authHeader(),
-      });
-      setDevices(res.data.data || []);
-      setTotal(res.data.total || 0);
+      
+      const [devRes, reqRes] = await Promise.all([
+        axios.get(`${API_URL}/list?page=1&limit=100`, { headers: authHeader() }),
+        axios.get(`${ALLOCATION_API_URL}/list?page=1&limit=5`, { headers: authHeader() })
+      ]);
+      
+      setDevices(devRes.data.data || []);
+      setTotal(devRes.data.total || 0);
+      setRequests(reqRes.data.data || []);
     } catch (err) {
       handleAuthError(err);
       setError(err?.response?.data?.message || "Không tải được dữ liệu dashboard.");
@@ -90,8 +97,33 @@ const Dashboard = () => {
     };
   }, [devices]);
 
-  const recentDevices = devices.slice(0, 6);
-  const statusRows = Object.entries(summary.byStatus);
+  const pieData = useMemo(() => {
+    return [
+      { name: "Sẵn sàng", value: summary.byStatus.SAN_SANG, color: "var(--success, #2f7654)" },
+      { name: "Đã cấp phát", value: summary.byStatus.DA_CAP_PHAT, color: "var(--accent, #315a58)" },
+      { name: "Thanh lý", value: summary.byStatus.THANH_LY, color: "var(--danger, #b4433b)" },
+    ].filter(d => d.value > 0);
+  }, [summary]);
+
+  const categoryData = useMemo(() => {
+    const cats = devices.reduce((acc, dev) => {
+      const type = dev.LoaiThietBi || "Khác";
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(cats)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [devices]);
+
+  const recentDevices = devices.slice(0, 5);
+
+  const role = (localStorage.getItem("role") || "").toUpperCase();
+  const isAdmin = role === "ADMIN";
+  const isManager = role === "MANAGER";
+  const isHR = role === "HR";
+  
 
   return (
     <div className="page-container">
@@ -135,35 +167,75 @@ const Dashboard = () => {
         <section className="dashboard-grid">
           <div className="dashboard-section">
             <div className="section-heading">
-              <h2>Phân bổ trạng thái</h2>
+              <h2>Trạng thái thiết bị</h2>
               <span>{loading ? "Đang tải..." : `${devices.length} thiết bị`}</span>
             </div>
-
-            <div className="status-stack">
-              {statusRows.map(([status, count]) => {
-                const percent = devices.length ? Math.round((count / devices.length) * 100) : 0;
-                return (
-                  <div className="status-row" key={status}>
-                    <div className="status-row-top">
-                      <span>{STATUS_LABEL[status] || status}</span>
-                      <strong>{count}</strong>
-                    </div>
-                    <div className="status-track">
-                      <span
-                        className={`status-fill ${STATUS_TONE[status] || "ready"}`}
-                        style={{ width: `${percent}%` }}
-                      />
-                    </div>
-                    <small>{percent}%</small>
-                  </div>
-                );
-              })}
+            <div style={{ width: '100%', height: 300 }}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
           <div className="dashboard-section">
             <div className="section-heading">
-              <h2>Thiết bị gần đây</h2>
+              <h2>Phân bổ theo danh mục (Top 5)</h2>
+            </div>
+            <div style={{ width: '100%', height: 300 }}>
+              <ResponsiveContainer>
+                <BarChart data={categoryData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" tick={{fontSize: 12}} />
+                  <YAxis tick={{fontSize: 12}} />
+                  <RechartsTooltip cursor={{fill: 'rgba(0,0,0,0.04)'}} />
+                  <Bar dataKey="count" fill="var(--accent, #315a58)" radius={[4, 4, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </section>
+
+        <section className="dashboard-grid" style={{ marginTop: '18px' }}>
+          <div className="dashboard-section">
+            <div className="section-heading">
+              <h2>Yêu cầu cấp phát gần đây</h2>
+              <button className="link-button" onClick={() => navigate("/allocation-requests")}>
+                Xem tất cả
+              </button>
+            </div>
+
+            <div className="recent-list">
+              {loading ? (
+                <div className="empty-state">Đang tải dữ liệu...</div>
+              ) : requests.length === 0 ? (
+                <div className="empty-state">Chưa có yêu cầu nào.</div>
+              ) : (
+                requests.map((req) => (
+                  <div className="recent-item" key={req.ID_YC}>
+                    <div>
+                      <strong>#{req.ID_YC} - {req.LoaiYeuCau === "CAP_PHAT" ? "Cấp phát" : "Thu hồi"}</strong>
+                      <span>{req.HoTen || `NV #${req.ID_NV}`} • {req.TenThietBi || `TB #${req.ID_TB || "-"}`}</span>
+                    </div>
+                    <span className={`status-badge status-${req.TrangThaiDuyet === 'ChoDuyet' ? 'PENDING' : req.TrangThaiDuyet === 'DaDuyet' ? 'APPROVED' : 'REJECTED'}`}>
+                      {req.TrangThaiDuyet === 'ChoDuyet' ? "Chờ duyệt" : req.TrangThaiDuyet === 'DaDuyet' ? "Đã duyệt" : "Từ chối"}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="dashboard-section">
+            <div className="section-heading">
+              <h2>Thiết bị thêm gần đây</h2>
               <button className="link-button" onClick={() => navigate("/devices")}>
                 Xem tất cả
               </button>

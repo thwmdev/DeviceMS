@@ -5,6 +5,7 @@ import "../index.css";
 import "../App.css";
 import Sidebar from "../components/sidebar";
 import SortableHeader from "../components/SortableHeader";
+import Pagination from "../components/Pagination";
 import { getNextSort, sortRows } from "../utils/tableSort";
 
 const API_URL = "http://127.0.0.1:5000/api/device";
@@ -35,13 +36,14 @@ export default function Devices() {
 
   // List state
   const [devices, setDevices] = useState([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: "MaTB", direction: "asc" });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Batch filter
   const [batches, setBatches] = useState([]);
@@ -74,8 +76,7 @@ export default function Devices() {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        page: String(page),
-        limit: "10",
+        limit: "10000",
         search,
       });
       if (batchFilter) params.set("batch_id", batchFilter);
@@ -83,7 +84,6 @@ export default function Devices() {
         headers: authHeader(),
       });
       setDevices(res.data.data || []);
-      setTotalPages(res.data.total_pages || 1);
       setTotal(res.data.total || 0);
     } catch (err) {
       handleAuthError(err);
@@ -91,7 +91,7 @@ export default function Devices() {
     } finally {
       setLoading(false);
     }
-  }, [authHeader, handleAuthError, page, search, batchFilter]);
+  }, [authHeader, handleAuthError, search, batchFilter]);
 
   const loadBatches = useCallback(async () => {
     try {
@@ -150,10 +150,11 @@ export default function Devices() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchInput);
-      setPage(1);
     }, 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  useEffect(() => { setCurrentPage(1); }, [search, batchFilter]);
 
   useEffect(() => { loadDevices(); }, [loadDevices]);
 
@@ -165,6 +166,12 @@ export default function Devices() {
   const sortedDevices = useMemo(
     () => sortRows(tableRows, sortConfig),
     [tableRows, sortConfig],
+  );
+
+  const totalPages = Math.ceil(sortedDevices.length / itemsPerPage) || 1;
+  const currentDevices = sortedDevices.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   // ── Single edit modal ───────────────────────────────────────────
@@ -220,22 +227,7 @@ export default function Devices() {
     }
   };
 
-  // ── Delete (thanh lý) ───────────────────────────────────────────
-  const handleDelete = async (matb, tenThietBi) => {
-    if (!window.confirm(`Thanh lý thiết bị "${tenThietBi}"?`)) return;
-    try {
-      setLoading(true);
-      await axios.delete(`${API_URL}/delete/${matb}`, { headers: authHeader() });
-      alert("Thanh lý thành công.");
-      if (devices.length === 1 && page > 1) setPage((current) => current - 1);
-      else await Promise.all([loadDevices(), loadMetrics()]);
-    } catch (err) {
-      handleAuthError(err);
-      alert(err?.response?.data?.message || "Thanh lý thất bại.");
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   return (
     <div className="page-container">
@@ -287,7 +279,7 @@ export default function Devices() {
             <select
               className="filter-select"
               value={batchFilter}
-              onChange={(event) => { setBatchFilter(event.target.value); setPage(1); }}
+              onChange={(event) => { setBatchFilter(event.target.value); }}
             >
               <option value="">Tất cả đợt nhập</option>
               {batches.map((b) => (
@@ -361,20 +353,21 @@ export default function Devices() {
                   onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
                 />
               </th>
+              <th>Người sử dụng</th>
               {!isUser && <th>Hành động</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={isUser ? 7 : 8}>Đang tải dữ liệu...</td>
+                <td colSpan={isUser ? 8 : 9}>Đang tải dữ liệu...</td>
               </tr>
-            ) : sortedDevices.length === 0 ? (
+            ) : currentDevices.length === 0 ? (
               <tr>
-                <td colSpan={isUser ? 7 : 8}>Không có dữ liệu</td>
+                <td colSpan={isUser ? 8 : 9}>Không có dữ liệu</td>
               </tr>
             ) : (
-              sortedDevices.map((device) => (
+              currentDevices.map((device) => (
                 <tr key={device.MaTB}>
                   <td>{device.MaThietBi}</td>
                   <td>{device.TenThietBi}</td>
@@ -391,23 +384,14 @@ export default function Devices() {
                       {STATUS_LABEL[device.TrangThai] || device.TrangThai}
                     </span>
                   </td>
+                  <td>
+                    {device.TrangThai === "DA_CAP_PHAT" ? (device.NguoiSuDung || "-") : "-"}
+                  </td>
                   {!isUser && (
                     <td>
                       <div className="table-actions">
                         <button className="btn-edit" onClick={() => handleOpenEditModal(device)} disabled={loading}>
                           Sửa
-                        </button>
-                        <button
-                          className="btn-delete"
-                          onClick={() => handleDelete(device.MaTB, device.TenThietBi)}
-                          disabled={loading || device.TrangThai === "DA_CAP_PHAT" || device.TrangThai === "THANH_LY"}
-                          title={
-                            device.TrangThai === "DA_CAP_PHAT"
-                              ? "Không thể thanh lý thiết bị đang cấp phát"
-                              : "Thanh lý thiết bị"
-                          }
-                        >
-                          Thanh lý
                         </button>
                       </div>
                     </td>
@@ -418,13 +402,11 @@ export default function Devices() {
           </tbody>
         </table>
 
-        <div className="pagination">
-          <button disabled={page === 1 || loading} onClick={() => setPage(1)}>«</button>
-          <button disabled={page === 1 || loading} onClick={() => setPage((current) => current - 1)}>‹ Trước</button>
-          <span>Trang {page} / {totalPages}</span>
-          <button disabled={page === totalPages || loading} onClick={() => setPage((current) => current + 1)}>Sau ›</button>
-          <button disabled={page === totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
-        </div>
+        <Pagination 
+          currentPage={currentPage} 
+          totalPages={totalPages} 
+          onPageChange={setCurrentPage} 
+        />
 
         {/* ── Single edit modal ──────────────────────────────────── */}
         {openEditModal && (
@@ -480,8 +462,10 @@ export default function Devices() {
                       onChange={(e) => setEditForm((prev) => ({ ...prev, LoaiThietBi: e.target.value }))}
                     >
                       <option value="">Chọn loại thiết bị</option>
-                      {categories.map((item) => (
-                        <option key={item.ID_DM} value={item.TenDanhMuc}>{item.TenDanhMuc}</option>
+                      {categories
+                        .filter((item) => item.TrangThai === "HoatDong" || item.TenDanhMuc === editForm.LoaiThietBi)
+                        .map((item) => (
+                          <option key={item.ID_DM} value={item.TenDanhMuc}>{item.TenDanhMuc}</option>
                       ))}
                     </select>
                   </div>

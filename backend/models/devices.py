@@ -94,6 +94,20 @@ def _ensure_device_columns():
             conn.commit()
             cursor.execute("UPDATE THIETBI SET NgayTao = COALESCE(NgayMua, CURRENT_TIMESTAMP()) WHERE NgayTao IS NULL")
             conn.commit()
+
+        # Thêm MaDotThanhLy
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'THIETBI'
+              AND COLUMN_NAME = 'MaDotThanhLy'
+            """
+        )
+        if cursor.fetchone()["cnt"] == 0:
+            cursor.execute("ALTER TABLE THIETBI ADD COLUMN MaDotThanhLy VARCHAR(50) NULL")
+            conn.commit()
     finally:
         if cursor:
             cursor.close()
@@ -121,11 +135,12 @@ def map_to_frontend(db_device):
         "GiaTri": float(db_device["NguyenGia"]) if db_device["NguyenGia"] is not None else None,
         "TrangThai": normalize_status_for_frontend(db_device["TrangThai"]),
         "MaDot": db_device.get("MaDot") or "",
+        "NguoiSuDung": db_device.get("NguoiSuDung") or "",
     }
 
 
 
-def get_devices_paginated(page=1, limit=10, search="", batch_id="", employee_id=None):
+def get_devices_paginated(page=1, limit=10, search="", batch_id="", dispose_batch_id="", employee_id=None):
     _ensure_device_columns()
     conn = None
     cursor = None
@@ -141,27 +156,37 @@ def get_devices_paginated(page=1, limit=10, search="", batch_id="", employee_id=
         params = []
 
         if employee_id:
-            where_clause += " AND ID_TB IN (SELECT ID_TB FROM LICHSUCAPPHAT WHERE ID_NV = %s AND (TrangThai IS NULL OR TrangThai NOT IN ('DaThuHoi', 'ThuHoi')))"
+            where_clause += " AND t.ID_TB IN (SELECT ID_TB FROM LICHSUCAPPHAT WHERE ID_NV = %s AND (TrangThai IS NULL OR TrangThai NOT IN ('DaThuHoi', 'ThuHoi')))"
             params.append(employee_id)
 
         if search:
-            where_clause += " AND (CAST(ID_TB AS CHAR) LIKE %s OR TenThietBi LIKE %s OR SeriNumber LIKE %s)"
+            where_clause += " AND (CAST(t.ID_TB AS CHAR) LIKE %s OR t.TenThietBi LIKE %s OR t.SeriNumber LIKE %s)"
             keyword = f"%{search}%"
             params.extend([keyword, keyword, keyword])
 
         if batch_id:
-            where_clause += " AND MaDot = %s"
+            where_clause += " AND t.MaDot = %s"
             params.append(batch_id)
 
-        count_query = f"SELECT COUNT(*) AS total FROM {TABLE_NAME} {where_clause}"
+        if dispose_batch_id:
+            where_clause += " AND t.MaDotThanhLy = %s"
+            params.append(dispose_batch_id)
+
+        count_query = f"SELECT COUNT(*) AS total FROM {TABLE_NAME} t {where_clause}"
         cursor.execute(count_query, tuple(params))
         total = cursor.fetchone()["total"]
 
         data_query = f"""
-            SELECT *
-            FROM {TABLE_NAME}
+            SELECT t.*, 
+                   (SELECT n.HoTen 
+                    FROM LICHSUCAPPHAT cp 
+                    JOIN NHANVIEN n ON cp.ID_NV = n.ID_NV 
+                    WHERE cp.ID_TB = t.ID_TB 
+                      AND (cp.TrangThai IS NULL OR cp.TrangThai NOT IN ('DaThuHoi', 'ThuHoi')) 
+                    ORDER BY cp.NgayCap DESC LIMIT 1) AS NguoiSuDung
+            FROM {TABLE_NAME} t
             {where_clause}
-            ORDER BY ID_TB ASC
+            ORDER BY t.ID_TB ASC
             LIMIT %s OFFSET %s
         """
         params.extend([limit, offset])
@@ -213,7 +238,17 @@ def get_device_by_id(matb):
 
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            f"SELECT * FROM {TABLE_NAME} WHERE ID_TB = %s",
+            f"""
+            SELECT t.*, 
+                   (SELECT n.HoTen 
+                    FROM LICHSUCAPPHAT cp 
+                    JOIN NHANVIEN n ON cp.ID_NV = n.ID_NV 
+                    WHERE cp.ID_TB = t.ID_TB 
+                      AND (cp.TrangThai IS NULL OR cp.TrangThai NOT IN ('DaThuHoi', 'ThuHoi')) 
+                    ORDER BY cp.NgayCap DESC LIMIT 1) AS NguoiSuDung
+            FROM {TABLE_NAME} t
+            WHERE t.ID_TB = %s
+            """,
             (matb,),
         )
         return map_to_frontend(cursor.fetchone())
@@ -240,6 +275,18 @@ def create_device(data):
 
         seri = str(data.get("SeriNumber") or "").strip() or None
         ma_dot = str(data.get("MaDot") or "").strip() or None
+
+        # Auto create category if not exists
+        loai_thiet_bi = str(data["LoaiThietBi"]).strip()
+        if loai_thiet_bi:
+            cursor.execute("SELECT ID_DM FROM DANHMUCSANPHAM WHERE TenDanhMuc = %s", (loai_thiet_bi,))
+            if not cursor.fetchone():
+                import uuid
+                ma_danh_muc = f"DM_{str(uuid.uuid4())[:6].upper()}"
+                cursor.execute(
+                    "INSERT INTO DANHMUCSANPHAM (MaDanhMuc, TenDanhMuc, TrangThai, MaDot) VALUES (%s, %s, 'HoatDong', %s)",
+                    (ma_danh_muc, loai_thiet_bi, ma_dot)
+                )
 
         cursor.execute(
             f"""
@@ -360,3 +407,61 @@ def soft_delete_device(matb):
             cursor.close()
         if conn:
             conn.close()
+
+
+def batch_dispose_devices(device_ids, batch_id):
+    if not device_ids:
+        raise ValueError("Danh sách thiết bị không được rỗng.")
+    if not batch_id:
+        raise ValueError("Mã đợt thanh lý không được để trống.")
+        
+    _ensure_device_columns()
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        if not conn:
+            raise Exception("Khong the ket noi co so du lieu.")
+
+        cursor = conn.cursor(dictionary=True)
+        
+        # Tạo chuỗi tham số %s, %s, ...
+        placeholders = ', '.join(['%s'] * len(device_ids))
+        
+        # Kiểm tra xem có thiết bị nào đang cấp phát không
+        cursor.execute(
+            f"SELECT ID_TB, TrangThai FROM {TABLE_NAME} WHERE ID_TB IN ({placeholders})",
+            tuple(device_ids),
+        )
+        rows = cursor.fetchall()
+        
+        if len(rows) != len(device_ids):
+            raise ValueError("Một số thiết bị không tồn tại trong hệ thống.")
+            
+        for row in rows:
+            if normalize_status_for_frontend(row["TrangThai"]) == "DA_CAP_PHAT":
+                raise ValueError(f"Thiết bị mã {row['ID_TB']} đang được cấp phát, không thể thanh lý.")
+            if normalize_status_for_frontend(row["TrangThai"]) == "THANH_LY":
+                raise ValueError(f"Thiết bị mã {row['ID_TB']} đã được thanh lý trước đó.")
+
+        cursor.close()
+        cursor = conn.cursor()
+        
+        # Cập nhật hàng loạt
+        params = ["THANH_LY", batch_id] + list(device_ids)
+        cursor.execute(
+            f"UPDATE {TABLE_NAME} SET TrangThai = %s, NgayThanhLy = CURRENT_TIMESTAMP, MaDotThanhLy = %s WHERE ID_TB IN ({placeholders})",
+            tuple(params),
+        )
+        conn.commit()
+        return cursor.rowcount
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+

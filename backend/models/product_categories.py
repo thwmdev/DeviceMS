@@ -249,13 +249,22 @@ def update_category(category_id, data):
         if not conn:
             raise Exception("Khong the ket noi co so du lieu.")
 
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=True)
         cursor.execute(
             f"SELECT ID_DM FROM {TABLE_NAME} WHERE MaDanhMuc = %s AND ID_DM != %s",
             (payload["MaDanhMuc"], category_id),
         )
         if cursor.fetchone():
             raise ValueError("Ma danh muc da ton tai.")
+
+        cursor.execute(f"SELECT TenDanhMuc FROM {TABLE_NAME} WHERE ID_DM = %s", (category_id,))
+        old_cat = cursor.fetchone()
+        if not old_cat:
+            raise ValueError("Danh muc khong ton tai.")
+        old_name = old_cat["TenDanhMuc"]
+
+        cursor.close()
+        cursor = conn.cursor()
 
         cursor.execute(
             f"""
@@ -274,8 +283,11 @@ def update_category(category_id, data):
                 category_id,
             ),
         )
-        if cursor.rowcount == 0:
-            raise ValueError("Danh muc khong ton tai.")
+        
+        # Update device table if category name changed
+        if old_name != payload["TenDanhMuc"]:
+            cursor.execute("UPDATE THIETBI SET Loai = %s WHERE Loai = %s", (payload["TenDanhMuc"], old_name))
+
         conn.commit()
     except Exception:
         if conn:

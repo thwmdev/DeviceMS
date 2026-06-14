@@ -123,6 +123,46 @@ def get_inventory_batches():
         if conn:
             conn.close()
 
+def get_disposal_batches():
+    from database.db import get_connection
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        if not conn:
+            raise Exception("Khong the ket noi co so du lieu.")
+        
+        cursor = conn.cursor(dictionary=True)
+        query = """
+            SELECT 
+                MaDotThanhLy AS batchId,
+                COUNT(*) AS totalItems,
+                SUM(COALESCE(NguyenGia, 0)) AS totalValue,
+                MIN(NgayThanhLy) AS disposeDate
+            FROM THIETBI
+            WHERE MaDotThanhLy IS NOT NULL AND MaDotThanhLy != '' AND TrangThai IN ('THANH_LY', 'Thanh lý', 'ThanhLy')
+            GROUP BY MaDotThanhLy
+            ORDER BY disposeDate DESC, MaDotThanhLy DESC
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        
+        formatted = []
+        for r in rows:
+            formatted.append({
+                "batchId": r["batchId"],
+                "total": int(r["totalItems"]),
+                "value": float(r["totalValue"]),
+                "date": _date_to_text(r["disposeDate"])
+            })
+        return formatted
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 def get_inventory_transactions(limit=100):
     conn = None
     cursor = None
@@ -218,8 +258,8 @@ def get_inventory_transactions(limit=100):
                     NgayThanhLy AS date, 
                     NguyenGia AS value, 
                     NULL AS employee, 
-                    MaDot AS batch, 
-                    'Thanh lý thiết bị trực tiếp từ kho' AS description
+                    MaDotThanhLy AS batch, 
+                    CONCAT('Thanh lý thiết bị đợt ', COALESCE(MaDotThanhLy, 'lẻ')) AS description
                 FROM THIETBI
                 WHERE TrangThai IN ('THANH_LY', 'Thanh lý', 'ThanhLy') AND NgayThanhLy IS NOT NULL
             )

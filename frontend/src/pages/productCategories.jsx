@@ -4,6 +4,7 @@ import axios from "axios";
 import "../App.css";
 import Sidebar from "../components/sidebar";
 import SortableHeader from "../components/SortableHeader";
+import Pagination from "../components/Pagination";
 import { getNextSort, sortRows } from "../utils/tableSort";
 
 const API_URL = "http://127.0.0.1:5000/api/product-category";
@@ -48,13 +49,14 @@ export default function ProductCategories() {
   const canManageCategories = localStorage.getItem("role")?.toUpperCase() === "ADMIN";
 
   const [categories, setCategories] = useState([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: "MaDanhMuc", direction: "asc" });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Batch filter
   const [batches, setBatches] = useState([]);
@@ -87,8 +89,7 @@ export default function ProductCategories() {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        page: String(page),
-        limit: "10",
+        limit: "10000",
         search,
       });
       if (batchFilter) params.set("batch_id", batchFilter);
@@ -96,7 +97,6 @@ export default function ProductCategories() {
         headers: authHeader(),
       });
       setCategories(res.data.data || []);
-      setTotalPages(res.data.total_pages || 1);
       setTotal(res.data.total || 0);
     } catch (err) {
       handleAuthError(err);
@@ -104,7 +104,7 @@ export default function ProductCategories() {
     } finally {
       setLoading(false);
     }
-  }, [authHeader, handleAuthError, page, search, batchFilter]);
+  }, [authHeader, handleAuthError, search, batchFilter]);
 
   const loadBatches = useCallback(async () => {
     try {
@@ -120,10 +120,11 @@ export default function ProductCategories() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchInput);
-      setPage(1);
     }, 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  useEffect(() => { setCurrentPage(1); }, [search, batchFilter]);
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
 
@@ -135,6 +136,12 @@ export default function ProductCategories() {
   const sortedCategories = useMemo(
     () => sortRows(tableRows, sortConfig),
     [tableRows, sortConfig],
+  );
+
+  const totalPages = Math.ceil(sortedCategories.length / itemsPerPage) || 1;
+  const currentCategories = sortedCategories.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   // ── Batch create modal ──────────────────────────────────────────
@@ -248,22 +255,6 @@ export default function ProductCategories() {
     }
   };
 
-  const handleDelete = async (category) => {
-    if (!window.confirm(`Xóa danh mục "${category.TenDanhMuc}"?`)) return;
-    try {
-      setLoading(true);
-      await axios.delete(`${API_URL}/delete/${category.ID_DM}`, { headers: authHeader() });
-      alert("Xóa danh mục thành công.");
-      if (categories.length === 1 && page > 1) setPage((current) => current - 1);
-      else await loadCategories();
-    } catch (err) {
-      handleAuthError(err);
-      alert(err?.response?.data?.message || "Xóa danh mục thất bại.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="page-container">
       <Sidebar />
@@ -288,7 +279,7 @@ export default function ProductCategories() {
             <select
               className="filter-select"
               value={batchFilter}
-              onChange={(event) => { setBatchFilter(event.target.value); setPage(1); }}
+              onChange={(event) => { setBatchFilter(event.target.value); }}
             >
               <option value="">Tất cả đợt nhập</option>
               {batches.map((b) => (
@@ -342,10 +333,10 @@ export default function ProductCategories() {
           <tbody>
             {loading ? (
               <tr><td colSpan="6">Đang tải dữ liệu...</td></tr>
-            ) : sortedCategories.length === 0 ? (
+            ) : currentCategories.length === 0 ? (
               <tr><td colSpan="6">Không có dữ liệu</td></tr>
             ) : (
-              sortedCategories.map((category) => (
+              currentCategories.map((category) => (
                 <tr key={category.ID_DM}>
                   <td>{category.MaDanhMuc}</td>
                   <td>{category.TenDanhMuc}</td>
@@ -367,7 +358,6 @@ export default function ProductCategories() {
                         >
                           {category.TrangThai === "HoatDong" ? "Tạm dừng" : "Kích hoạt"}
                         </button>
-                        <button className="btn-delete" onClick={() => handleDelete(category)} disabled={loading}>Xóa</button>
                       </div>
                     ) : (
                       <span className="table-muted">Chỉ xem</span>
@@ -379,13 +369,11 @@ export default function ProductCategories() {
           </tbody>
         </table>
 
-        <div className="pagination">
-          <button disabled={page === 1 || loading} onClick={() => setPage(1)}>«</button>
-          <button disabled={page === 1 || loading} onClick={() => setPage((current) => current - 1)}>‹ Trước</button>
-          <span>Trang {page} / {totalPages}</span>
-          <button disabled={page === totalPages || loading} onClick={() => setPage((current) => current + 1)}>Sau ›</button>
-          <button disabled={page === totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
-        </div>
+        <Pagination 
+          currentPage={currentPage} 
+          totalPages={totalPages} 
+          onPageChange={setCurrentPage} 
+        />
 
         {/* ── Batch create modal ─────────────────────────────────── */}
         {openBatchModal && (

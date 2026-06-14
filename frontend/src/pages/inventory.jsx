@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import Sidebar from "../components/sidebar";
+import Pagination from "../components/Pagination";
 import "../index.css";
 import "../App.css";
 import "../styles/inventory.css";
@@ -60,10 +61,21 @@ export default function Inventory() {
   // States
   const [activeTab, setActiveTab] = useState("overview"); // overview, batches, history
   const [loading, setLoading] = useState(false);
+  const [currentPageBatches, setCurrentPageBatches] = useState(1);
+  const [currentPageDisposeBatches, setCurrentPageDisposeBatches] = useState(1);
+  const [currentPageHistory, setCurrentPageHistory] = useState(1);
+  const itemsPerPage = 10;
+
+  // Search states
+  const [searchCategory, setSearchCategory] = useState("");
+  const [searchModel, setSearchModel] = useState("");
+  const [searchDisposeBatch, setSearchDisposeBatch] = useState("");
+  const [searchDisposeModal, setSearchDisposeModal] = useState("");
 
   // Data
   const [stats, setStats] = useState({ categories: [], models: [] });
   const [batches, setBatches] = useState([]);
+  const [disposeBatches, setDisposeBatches] = useState([]);
   const [history, setHistory] = useState([]);
   const [categories, setCategories] = useState([]);
   const [availableDevices, setAvailableDevices] = useState([]);
@@ -75,11 +87,13 @@ export default function Inventory() {
   const [importError, setImportError] = useState("");
 
   const [openDisposeModal, setOpenDisposeModal] = useState(false);
-  const [disposeTargetId, setDisposeTargetId] = useState("");
+  const [disposeBatchId, setDisposeBatchId] = useState("");
+  const [disposeQuantities, setDisposeQuantities] = useState({});
   const [disposeError, setDisposeError] = useState("");
 
   // Batch Detail Modal
   const [openBatchDetailModal, setOpenBatchDetailModal] = useState(false);
+  const [batchDetailType, setBatchDetailType] = useState("import"); // "import" or "dispose"
   const [selectedBatchId, setSelectedBatchId] = useState("");
   const [batchDevices, setBatchDevices] = useState([]);
   const [loadingBatchDevices, setLoadingBatchDevices] = useState(false);
@@ -118,6 +132,15 @@ export default function Inventory() {
     }
   }, [authHeader, handleAuthError]);
 
+  const loadDisposeBatches = useCallback(async () => {
+    try {
+      const res = await axios.get(`${INVENTORY_API_URL}/disposal-batches`, { headers: authHeader() });
+      setDisposeBatches(res.data.batches || []);
+    } catch (err) {
+      handleAuthError(err);
+    }
+  }, [authHeader, handleAuthError]);
+
   const loadHistory = useCallback(async () => {
     try {
       const res = await axios.get(`${INVENTORY_API_URL}/transactions?limit=100`, { headers: authHeader() });
@@ -151,17 +174,53 @@ export default function Inventory() {
   useEffect(() => {
     loadStats();
     loadBatches();
+    loadDisposeBatches();
     loadHistory();
     loadCategories();
-  }, [loadStats, loadBatches, loadHistory, loadCategories]);
+  }, [loadStats, loadBatches, loadDisposeBatches, loadHistory, loadCategories]);
 
   // Tab switcher refresh
   const handleTabChange = (tabName) => {
     setActiveTab(tabName);
-    if (tabName === "overview") loadStats();
-    else if (tabName === "batches") loadBatches();
-    else if (tabName === "history") loadHistory();
+    if (tabName === "batches") { setCurrentPageBatches(1); loadBatches(); }
+    else if (tabName === "dispose_batches") { setCurrentPageDisposeBatches(1); loadDisposeBatches(); }
+    else if (tabName === "history") { setCurrentPageHistory(1); loadHistory(); }
+    else if (tabName === "overview") loadStats();
   };
+
+  const totalBatchPages = Math.ceil(batches.length / itemsPerPage) || 1;
+  const currentBatches = batches.slice((currentPageBatches - 1) * itemsPerPage, currentPageBatches * itemsPerPage);
+
+  // Filtered Overview Data
+  const filteredCategories = useMemo(() => {
+    if (!stats.categories) return [];
+    return stats.categories.filter((item) => 
+      item.category.toLowerCase().includes(searchCategory.toLowerCase())
+    );
+  }, [stats.categories, searchCategory]);
+
+  const filteredModels = useMemo(() => {
+    if (!stats.models) return [];
+    return stats.models.filter((item) => 
+      item.modelName.toLowerCase().includes(searchModel.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchModel.toLowerCase())
+    );
+  }, [stats.models, searchModel]);
+
+  // Filtered Dispose Batches
+  const filteredDisposeBatches = useMemo(() => {
+    return disposeBatches.filter((b) => 
+      b.batchId.toLowerCase().includes(searchDisposeBatch.toLowerCase()) ||
+      (b.date && new Date(b.date).toLocaleDateString("vi-VN").includes(searchDisposeBatch))
+    );
+  }, [disposeBatches, searchDisposeBatch]);
+
+  const totalDisposeBatchPages = Math.ceil(filteredDisposeBatches.length / itemsPerPage) || 1;
+  const currentDisposeBatches = filteredDisposeBatches.slice((currentPageDisposeBatches - 1) * itemsPerPage, currentPageDisposeBatches * itemsPerPage);
+
+
+  const totalHistoryPages = Math.ceil(history.length / itemsPerPage) || 1;
+  const currentHistory = history.slice((currentPageHistory - 1) * itemsPerPage, currentPageHistory * itemsPerPage);
 
   // ── Nhập kho Modal (Batch Input / Excel) ──────────────────────────
   const openImport = () => {
@@ -304,29 +363,78 @@ export default function Inventory() {
   const openDispose = async () => {
     setLoading(true);
     await loadAvailableDevices();
-    setDisposeTargetId("");
+    setDisposeBatchId(`TL_${generateBatchId()}`);
+    setDisposeQuantities({});
     setDisposeError("");
+    setSearchDisposeModal("");
     setOpenDisposeModal(true);
     setLoading(false);
   };
 
+  const groupedDevices = useMemo(() => {
+    const map = {};
+    availableDevices.forEach(dev => {
+      const key = `${dev.TenThietBi}|${dev.LoaiThietBi}`;
+      if (!map[key]) {
+        map[key] = {
+          key,
+          TenThietBi: dev.TenThietBi,
+          LoaiThietBi: dev.LoaiThietBi,
+          GiaTri: dev.GiaTri,
+          availableCount: 0,
+          devices: []
+        };
+      }
+      map[key].availableCount++;
+      map[key].devices.push(dev);
+    });
+    return Object.values(map);
+  }, [availableDevices]);
+
+  // Filtered grouped devices in disposal modal
+  const filteredGroupedDevices = useMemo(() => {
+    return groupedDevices.filter(g => 
+      g.TenThietBi.toLowerCase().includes(searchDisposeModal.toLowerCase()) ||
+      g.LoaiThietBi.toLowerCase().includes(searchDisposeModal.toLowerCase())
+    );
+  }, [groupedDevices, searchDisposeModal]);
+
+  const handleQuantityChange = (key, val, max) => {
+    let num = parseInt(val) || 0;
+    if (num < 0) num = 0;
+    if (num > max) num = max;
+    setDisposeQuantities(prev => ({ ...prev, [key]: num }));
+  };
+
   const handleDispose = async () => {
-    if (!disposeTargetId) {
-      setDisposeError("Vui lòng chọn một thiết bị cần thanh lý.");
+    let targetIds = [];
+    for (const [key, qty] of Object.entries(disposeQuantities)) {
+      if (qty > 0) {
+        const group = groupedDevices.find(g => g.key === key);
+        if (group) {
+          targetIds.push(...group.devices.slice(0, qty).map(d => d.MaTB));
+        }
+      }
+    }
+
+    if (targetIds.length === 0) {
+      setDisposeError("Vui lòng nhập số lượng thanh lý lớn hơn 0 cho ít nhất một loại thiết bị.");
       return;
     }
-    const devObj = availableDevices.find((d) => String(d.MaTB) === String(disposeTargetId));
-    const label = devObj ? `"${devObj.TenThietBi}"` : `#${disposeTargetId}`;
-    if (!window.confirm(`Bạn có chắc chắn muốn thanh lý thiết bị ${label} trực tiếp từ kho không?`)) {
+
+    if (!window.confirm(`Bạn có chắc chắn muốn thanh lý tổng cộng ${targetIds.length} thiết bị trực tiếp từ kho không?`)) {
       return;
     }
 
     try {
       setLoading(true);
-      await axios.delete(`${DEVICE_API_URL}/delete/${disposeTargetId}`, { headers: authHeader() });
-      alert("Thanh lý thiết bị thành công.");
+      await axios.post(`${DEVICE_API_URL}/dispose-batch`, {
+        deviceIds: targetIds,
+        batchId: disposeBatchId
+      }, { headers: authHeader() });
+      alert(`Thanh lý thành công ${targetIds.length} thiết bị.`);
       setOpenDisposeModal(false);
-      handleTabChange("overview");
+      handleTabChange("dispose_batches");
     } catch (err) {
       handleAuthError(err);
       setDisposeError(err?.response?.data?.message || "Thanh lý thiết bị thất bại.");
@@ -335,15 +443,17 @@ export default function Inventory() {
     }
   };
 
-  // ── Xem chi tiết thiết bị đợt nhập ───────────────────────────────
-  const openBatchDetail = async (batchId) => {
+  // ── Xem chi tiết thiết bị đợt ───────────────────────────────
+  const openBatchDetail = async (batchId, type = "import") => {
     setSelectedBatchId(batchId);
+    setBatchDetailType(type);
     setOpenBatchDetailModal(true);
     setLoadingBatchDevices(true);
     try {
-      const res = await axios.get(`${DEVICE_API_URL}/list?batch_id=${batchId}&limit=100`, {
-        headers: authHeader(),
-      });
+      const url = type === "dispose"
+        ? `${DEVICE_API_URL}/list?dispose_batch_id=${batchId}&limit=100`
+        : `${DEVICE_API_URL}/list?batch_id=${batchId}&limit=100`;
+      const res = await axios.get(url, { headers: authHeader() });
       setBatchDevices(res.data.data || []);
     } catch (err) {
       console.error(err);
@@ -389,6 +499,12 @@ export default function Inventory() {
               Lịch sử đợt nhập
             </button>
             <button
+              className={`inventory-tab-btn ${activeTab === "dispose_batches" ? "active" : ""}`}
+              onClick={() => handleTabChange("dispose_batches")}
+            >
+              Lịch sử đợt thanh lý
+            </button>
+            <button
               className={`inventory-tab-btn ${activeTab === "history" ? "active" : ""}`}
               onClick={() => handleTabChange("history")}
             >
@@ -406,9 +522,19 @@ export default function Inventory() {
               <>
                 {/* 1. Category stats table */}
                 <div>
-                  <h2 style={{ fontSize: "16px", fontWeight: "760", color: "var(--accent)", marginBottom: "12px" }}>
-                    Tổng quan theo Loại thiết bị
-                  </h2>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <h2 style={{ fontSize: "16px", fontWeight: "760", color: "var(--accent)" }}>
+                      Tổng quan theo Loại thiết bị
+                    </h2>
+                    <input
+                      type="text"
+                      className="search-input"
+                      placeholder="Tìm kiếm loại thiết bị..."
+                      value={searchCategory}
+                      onChange={(e) => setSearchCategory(e.target.value)}
+                      style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px", width: "250px" }}
+                    />
+                  </div>
                   <table className="device-table" style={{ margin: 0 }}>
                     <thead>
                       <tr>
@@ -421,12 +547,12 @@ export default function Inventory() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(!stats.categories || stats.categories.length === 0) ? (
+                      {filteredCategories.length === 0 ? (
                         <tr>
                           <td colSpan="6">Không có dữ liệu</td>
                         </tr>
                       ) : (
-                        stats.categories.map((item) => (
+                        filteredCategories.map((item) => (
                           <tr key={item.category}>
                             <td><strong>{item.category}</strong></td>
                             <td>{item.total} chiếc</td>
@@ -443,9 +569,19 @@ export default function Inventory() {
 
                 {/* 2. Model stats table */}
                 <div>
-                  <h2 style={{ fontSize: "16px", fontWeight: "760", color: "var(--accent)", marginBottom: "12px" }}>
-                    Thống kê chi tiết theo Dòng thiết bị (Model)
-                  </h2>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <h2 style={{ fontSize: "16px", fontWeight: "760", color: "var(--accent)" }}>
+                      Thống kê chi tiết theo Dòng thiết bị (Model)
+                    </h2>
+                    <input
+                      type="text"
+                      className="search-input"
+                      placeholder="Tìm kiếm dòng máy hoặc loại..."
+                      value={searchModel}
+                      onChange={(e) => setSearchModel(e.target.value)}
+                      style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px", width: "250px" }}
+                    />
+                  </div>
                   <table className="device-table" style={{ margin: 0 }}>
                     <thead>
                       <tr>
@@ -459,12 +595,12 @@ export default function Inventory() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(!stats.models || stats.models.length === 0) ? (
+                      {filteredModels.length === 0 ? (
                         <tr>
                           <td colSpan="7">Không có dữ liệu</td>
                         </tr>
                       ) : (
-                        stats.models.map((item, idx) => (
+                        filteredModels.map((item, idx) => (
                           <tr key={idx}>
                             <td><strong>{item.modelName}</strong></td>
                             <td>{item.category}</td>
@@ -504,12 +640,12 @@ export default function Inventory() {
                   <tr>
                     <td colSpan="7">Đang tải danh sách đợt nhập...</td>
                   </tr>
-                ) : batches.length === 0 ? (
+                ) : currentBatches.length === 0 ? (
                   <tr>
                     <td colSpan="7">Chưa có đợt nhập kho nào được đăng ký.</td>
                   </tr>
                 ) : (
-                  batches.map((b) => (
+                  currentBatches.map((b) => (
                     <tr key={b.batchId}>
                       <td>
                         <strong>{b.batchId}</strong>
@@ -526,7 +662,7 @@ export default function Inventory() {
                         <strong>{b.value.toLocaleString("vi-VN")} ₫</strong>
                       </td>
                       <td style={{ textAlign: "center" }}>
-                        <button className="btn-edit" onClick={() => openBatchDetail(b.batchId)}>
+                        <button className="btn-edit" onClick={() => openBatchDetail(b.batchId, "import")}>
                           Xem chi tiết
                         </button>
                       </td>
@@ -535,6 +671,75 @@ export default function Inventory() {
                 )}
               </tbody>
             </table>
+            <Pagination 
+              currentPage={currentPageBatches} 
+              totalPages={totalBatchPages} 
+              onPageChange={setCurrentPageBatches} 
+            />
+          </div>
+        )}
+
+        {/* Tab: Dispose Batches */}
+        {activeTab === "dispose_batches" && (
+          <div className="table-container">
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Tìm kiếm mã đợt hoặc ngày thanh lý..."
+                value={searchDisposeBatch}
+                onChange={(e) => {
+                  setSearchDisposeBatch(e.target.value);
+                  setCurrentPageDisposeBatches(1);
+                }}
+                style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px", width: "300px" }}
+              />
+            </div>
+            <table className="device-table">
+              <thead>
+                <tr>
+                  <th>Mã đợt thanh lý</th>
+                  <th>Ngày thanh lý</th>
+                  <th>Tổng thiết bị</th>
+                  <th>Tổng nguyên giá trị đợt</th>
+                  <th style={{ textAlign: "center" }}>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan="4">Đang tải danh sách đợt thanh lý...</td>
+                  </tr>
+                ) : currentDisposeBatches.length === 0 ? (
+                  <tr>
+                    <td colSpan="4">Chưa có đợt thanh lý nào.</td>
+                  </tr>
+                ) : (
+                  currentDisposeBatches.map((b) => (
+                    <tr key={b.batchId}>
+                      <td>
+                        <strong>{b.batchId}</strong>
+                      </td>
+                      <td>{b.date ? new Date(b.date).toLocaleDateString("vi-VN") : "-"}</td>
+                      <td>{b.total} thiết bị</td>
+                      <td>
+                        <strong>{b.value.toLocaleString("vi-VN")} ₫</strong>
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <button className="btn-edit" onClick={() => openBatchDetail(b.batchId, "dispose")}>
+                          Xem chi tiết
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+            <Pagination 
+              currentPage={currentPageDisposeBatches} 
+              totalPages={totalDisposeBatchPages} 
+              onPageChange={setCurrentPageDisposeBatches} 
+            />
           </div>
         )}
 
@@ -543,10 +748,10 @@ export default function Inventory() {
           <div className="timeline-list">
             {loading ? (
               <p>Đang tải nhật ký kho...</p>
-            ) : history.length === 0 ? (
+            ) : currentHistory.length === 0 ? (
               <p>Chưa ghi nhận hoạt động kho nào.</p>
             ) : (
-              history.map((tx, idx) => (
+              currentHistory.map((tx, idx) => (
                 <div key={idx} className="timeline-item">
                   <div className={`timeline-icon ${tx.type}`}>
                     {tx.type === "IMPORT" ? "NHẬP" : tx.type === "ALLOCATE" ? "XUẤT" : tx.type === "RETURN" ? "THU" : "TLÝ"}
@@ -579,6 +784,13 @@ export default function Inventory() {
                   </div>
                 </div>
               ))
+            )}
+            {history.length > 0 && (
+              <Pagination 
+                currentPage={currentPageHistory} 
+                totalPages={totalHistoryPages} 
+                onPageChange={setCurrentPageHistory} 
+              />
             )}
           </div>
         )}
@@ -620,6 +832,11 @@ export default function Inventory() {
                 </div>
 
                 <div style={{ overflowX: "auto", maxHeight: "350px" }}>
+                  <datalist id="category-datalist">
+                    {categories.filter(item => item.TrangThai === "HoatDong").map((item) => (
+                      <option key={item.ID_DM} value={item.TenDanhMuc} />
+                    ))}
+                  </datalist>
                   <table className="device-table batch-input-table">
                     <thead>
                       <tr>
@@ -665,16 +882,14 @@ export default function Inventory() {
                             />
                           </td>
                           <td>
-                            <select
+                            <input
+                              type="text"
+                              list="category-datalist"
                               style={{ width: "100%" }}
+                              placeholder="Chọn hoặc nhập mới"
                               value={row.LoaiThietBi}
                               onChange={(e) => setImportRowField(idx, "LoaiThietBi", e.target.value)}
-                            >
-                              <option value="">Chọn loại</option>
-                              {categories.map((item) => (
-                                <option key={item.ID_DM} value={item.TenDanhMuc}>{item.TenDanhMuc}</option>
-                              ))}
-                            </select>
+                            />
                           </td>
                           <td>
                             <input
@@ -731,43 +946,96 @@ export default function Inventory() {
           </div>
         )}
 
-        {/* ── Modal Thanh lý ──────────────────────────────────────── */}
+        {/* ── Modal Thanh lý (Batch) ──────────────────────────────────────── */}
         {openDisposeModal && (
           <div className="modal-overlay" onClick={() => setOpenDisposeModal(false)}>
-            <div className="device-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="device-modal batch-modal wide-modal" onClick={(e) => e.stopPropagation()}>
               <div className="device-modal-header">
                 <div className="device-modal-title">
                   <div className="device-modal-icon" style={{ background: "var(--danger)" }}>TL</div>
                   <div>
                     <h2>Thanh lý thiết bị trực tiếp</h2>
-                    <p>Chọn thiết bị đang sẵn sàng trong kho để thanh lý trực tiếp.</p>
+                    <p style={{ fontSize: "0.78rem" }}>
+                      Mã đợt thanh lý: <strong>{disposeBatchId}</strong>
+                    </p>
                   </div>
                 </div>
                 <button className="modal-close-btn" onClick={() => setOpenDisposeModal(false)}>×</button>
               </div>
 
-              <div className="device-modal-body modal-form">
+              <div className="device-modal-body">
                 {disposeError && <div className="form-error modal-error">{disposeError}</div>}
+                
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <p style={{ margin: 0, color: "var(--ink-soft)", fontSize: "14px" }}>
+                    Chọn các thiết bị đang sẵn sàng trong kho bên dưới để thanh lý.
+                  </p>
+                  <input
+                    type="text"
+                    className="search-input"
+                    placeholder="Tìm thiết bị cần thanh lý..."
+                    value={searchDisposeModal}
+                    onChange={(e) => setSearchDisposeModal(e.target.value)}
+                    style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px", width: "250px" }}
+                  />
+                </div>
 
-                <div className="form-group">
-                  <label>Chọn thiết bị cần thanh lý <span>*</span></label>
-                  <select
-                    value={disposeTargetId}
-                    onChange={(e) => setDisposeTargetId(e.target.value)}
-                  >
-                    <option value="">-- Chọn thiết bị trong kho --</option>
-                    {availableDevices.map((dev) => (
-                      <option key={dev.MaTB} value={dev.MaTB}>
-                        {dev.TenThietBi} ({dev.LoaiThietBi}) {dev.SeriNumber ? `- S/N: ${dev.SeriNumber}` : ""} (#{dev.MaThietBi})
-                      </option>
-                    ))}
-                  </select>
+                <div style={{ overflowX: "auto", maxHeight: "400px" }}>
+                  <table className="device-table batch-input-table">
+                    <thead>
+                      <tr>
+                        <th>Tên thiết bị</th>
+                        <th>Loại</th>
+                        <th>Nguyên giá (₫)</th>
+                        <th style={{ textAlign: "center" }}>Sẵn sàng trong kho</th>
+                        <th style={{ width: "120px", textAlign: "center" }}>SL Thanh lý</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredGroupedDevices.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: "center" }}>Không tìm thấy thiết bị nào.</td>
+                        </tr>
+                      ) : (
+                        filteredGroupedDevices.map((group) => (
+                          <tr key={group.key}>
+                            <td><strong>{group.TenThietBi}</strong></td>
+                            <td>{group.LoaiThietBi}</td>
+                            <td>{group.GiaTri !== null ? group.GiaTri.toLocaleString("vi-VN") : "-"}</td>
+                            <td style={{ textAlign: "center" }}>
+                              <span className="status-badge status-SAN_SANG">{group.availableCount}</span>
+                            </td>
+                            <td style={{ textAlign: "center" }}>
+                              <input 
+                                type="number" 
+                                min="0" 
+                                max={group.availableCount}
+                                style={{ width: "80px", textAlign: "center", padding: "4px" }}
+                                value={disposeQuantities[group.key] || ""}
+                                onChange={(e) => handleQuantityChange(group.key, e.target.value, group.availableCount)}
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ marginTop: "12px", fontSize: "14px" }}>
+                  Tổng cộng: <strong>
+                    {Object.values(disposeQuantities).reduce((a, b) => a + (parseInt(b) || 0), 0)}
+                  </strong> thiết bị sẽ được thanh lý.
                 </div>
               </div>
 
               <div className="device-modal-footer">
                 <button className="btn-cancel" onClick={() => setOpenDisposeModal(false)} disabled={loading}>Hủy</button>
-                <button className="btn-save" onClick={handleDispose} disabled={loading} style={{ background: "var(--danger)" }}>
+                <button 
+                  className="btn-save" 
+                  onClick={handleDispose} 
+                  disabled={loading || Object.values(disposeQuantities).reduce((a, b) => a + (parseInt(b) || 0), 0) === 0} 
+                  style={{ background: "var(--danger)" }}
+                >
                   {loading ? "Đang xử lý..." : "Xác nhận thanh lý"}
                 </button>
               </div>
@@ -781,11 +1049,13 @@ export default function Inventory() {
             <div className="device-modal wide-modal" onClick={(e) => e.stopPropagation()}>
               <div className="device-modal-header">
                 <div className="device-modal-title">
-                  <div className="device-modal-icon">CT</div>
+                  <div className="device-modal-icon" style={{ background: batchDetailType === "dispose" ? "var(--danger)" : "var(--primary)" }}>
+                    CT
+                  </div>
                   <div>
-                    <h2>Chi tiết đợt nhập kho</h2>
+                    <h2>Chi tiết đợt {batchDetailType === "dispose" ? "thanh lý" : "nhập kho"}</h2>
                     <p>
-                      Mã đợt nhập: <strong>{selectedBatchId}</strong>
+                      Mã đợt {batchDetailType === "dispose" ? "thanh lý" : "nhập"}: <strong>{selectedBatchId}</strong>
                     </p>
                   </div>
                 </div>

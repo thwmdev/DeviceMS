@@ -4,6 +4,7 @@ import axios from "axios";
 import "../App.css";
 import Sidebar from "../components/sidebar";
 import SortableHeader from "../components/SortableHeader";
+import Pagination from "../components/Pagination";
 import { getNextSort, sortRows } from "../utils/tableSort";
 
 const API_URL = "http://127.0.0.1:5000/api/allocation-request";
@@ -83,8 +84,6 @@ export default function AllocationRequests() {
     availableDevices: [],
     activeAssignments: [],
   });
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -96,6 +95,9 @@ export default function AllocationRequests() {
   const [reviewTarget, setReviewTarget] = useState(null);
   const [reviewAction, setReviewAction] = useState("approve");
   const [sortConfig, setSortConfig] = useState({ key: "ID_YC", direction: "desc" });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Batch create modal
   const [openCreateModal, setOpenCreateModal] = useState(false);
@@ -134,13 +136,12 @@ export default function AllocationRequests() {
   const loadRequests = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({ page: String(page), limit: "10", search });
+      const params = new URLSearchParams({ limit: "10000", search });
       if (typeFilter) params.set("type", typeFilter);
       if (statusFilter) params.set("status", statusFilter);
       if (batchFilter) params.set("batch_id", batchFilter);
       const res = await axios.get(`${API_URL}/list?${params.toString()}`, { headers: authHeader() });
       setRequests(res.data.data || []);
-      setTotalPages(res.data.total_pages || 1);
       setTotal(res.data.total || 0);
     } catch (err) {
       handleAuthError(err);
@@ -148,7 +149,7 @@ export default function AllocationRequests() {
     } finally {
       setLoading(false);
     }
-  }, [authHeader, handleAuthError, page, search, statusFilter, typeFilter, batchFilter]);
+  }, [authHeader, handleAuthError, search, statusFilter, typeFilter, batchFilter]);
 
   const loadBatches = useCallback(async () => {
     try {
@@ -165,10 +166,11 @@ export default function AllocationRequests() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchInput);
-      setPage(1);
     }, 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  useEffect(() => { setCurrentPage(1); }, [search, typeFilter, statusFilter, batchFilter]);
 
   useEffect(() => { loadRequests(); }, [loadRequests]);
 
@@ -181,6 +183,12 @@ export default function AllocationRequests() {
   })), [requests]);
 
   const sortedRequests = useMemo(() => sortRows(tableRows, sortConfig), [tableRows, sortConfig]);
+
+  const totalPages = Math.ceil(sortedRequests.length / itemsPerPage) || 1;
+  const currentRequests = sortedRequests.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // ── Batch create modal ──────────────────────────────────────────
   const openNewRequest = () => {
@@ -330,7 +338,7 @@ export default function AllocationRequests() {
             <select
               className="filter-select"
               value={typeFilter}
-              onChange={(event) => { setTypeFilter(event.target.value); setPage(1); }}
+              onChange={(event) => { setTypeFilter(event.target.value); }}
             >
               <option value="">Tất cả loại</option>
               <option value="CAP_PHAT">Cấp phát</option>
@@ -340,7 +348,7 @@ export default function AllocationRequests() {
             <select
               className="filter-select"
               value={statusFilter}
-              onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}
+              onChange={(event) => { setStatusFilter(event.target.value); }}
             >
               <option value="">Tất cả trạng thái</option>
               <option value="ChoDuyet">Chờ duyệt</option>
@@ -352,7 +360,7 @@ export default function AllocationRequests() {
               <select
                 className="filter-select"
                 value={batchFilter}
-                onChange={(event) => { setBatchFilter(event.target.value); setPage(1); }}
+                onChange={(event) => { setBatchFilter(event.target.value); }}
               >
                 <option value="">Tất cả đợt</option>
                 {batches.map((b) => (
@@ -385,10 +393,10 @@ export default function AllocationRequests() {
           <tbody>
             {loading ? (
               <tr><td colSpan="8">Đang tải dữ liệu...</td></tr>
-            ) : sortedRequests.length === 0 ? (
+            ) : currentRequests.length === 0 ? (
               <tr><td colSpan="8">Chưa có yêu cầu nào.</td></tr>
             ) : (
-              sortedRequests.map((item) => (
+              currentRequests.map((item) => (
                 <tr key={item.ID_YC}>
                   <td>#{item.ID_YC}</td>
                   <td>
@@ -437,13 +445,11 @@ export default function AllocationRequests() {
           </tbody>
         </table>
 
-        <div className="pagination">
-          <button disabled={page === 1 || loading} onClick={() => setPage(1)}>«</button>
-          <button disabled={page === 1 || loading} onClick={() => setPage((c) => c - 1)}>‹ Trước</button>
-          <span>Trang {page} / {totalPages}</span>
-          <button disabled={page === totalPages || loading} onClick={() => setPage((c) => c + 1)}>Sau ›</button>
-          <button disabled={page === totalPages || loading} onClick={() => setPage(totalPages)}>»</button>
-        </div>
+        <Pagination 
+          currentPage={currentPage} 
+          totalPages={totalPages} 
+          onPageChange={setCurrentPage} 
+        />
 
         {/* ── Batch create modal ─────────────────────────────────── */}
         {openCreateModal && (

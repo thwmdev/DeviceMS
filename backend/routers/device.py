@@ -6,6 +6,7 @@ from models.devices import (
     create_device,
     update_device,
     soft_delete_device,
+    batch_dispose_devices,
 )
 from security.roles import token_and_role_required
 
@@ -23,6 +24,8 @@ def get_devices():
         search = request.args.get("search", "").strip()
         batch_id = request.args.get("batch_id", "").strip()
 
+        dispose_batch_id = request.args.get("dispose_batch_id", "").strip()
+
         claims = getattr(request, "user_claims", {}) or {}
         user_role = claims.get("role", "").upper()
         employee_id = None
@@ -34,7 +37,7 @@ def get_devices():
                 except (TypeError, ValueError):
                     pass
 
-        result = get_devices_paginated(page=page, limit=limit, search=search, batch_id=batch_id, employee_id=employee_id)
+        result = get_devices_paginated(page=page, limit=limit, search=search, batch_id=batch_id, dispose_batch_id=dispose_batch_id, employee_id=employee_id)
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"message": str(e)}), 500
@@ -124,3 +127,35 @@ def delete_device_route(matb):
         return jsonify({"message": str(e)}), 400
     except Exception as e:
         return jsonify({"message": "Có lỗi hệ thống xảy ra."}), 500
+
+
+@device_bp.route("/dispose-batch", methods=["POST"])
+@token_and_role_required(allowed_roles=["ADMIN"])
+def dispose_batch():
+    try:
+        data = request.json or {}
+        device_ids = data.get("deviceIds", [])
+        batch_id = data.get("batchId", "")
+        
+        if not device_ids or not isinstance(device_ids, list):
+            return jsonify({"message": "Danh sách thiết bị không hợp lệ."}), 400
+            
+        if not str(batch_id).strip():
+            return jsonify({"message": "Mã đợt thanh lý không được để trống."}), 400
+
+        # Validate that all device_ids are integers
+        valid_ids = []
+        for d in device_ids:
+            try:
+                valid_ids.append(int(str(d).strip()))
+            except (TypeError, ValueError):
+                return jsonify({"message": "Mã thiết bị không hợp lệ."}), 400
+
+        count = batch_dispose_devices(valid_ids, str(batch_id).strip())
+        return jsonify({"message": f"Đã thanh lý thành công {count} thiết bị."}), 200
+
+    except ValueError as e:
+        return jsonify({"message": str(e)}), 400
+    except Exception as e:
+        return jsonify({"message": "Có lỗi hệ thống xảy ra."}), 500
+

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Sidebar from "../components/sidebar";
 import AccountModal from "../components/accM";
+import Pagination from "../components/Pagination";
 import "../styles/acc.css";
 
 const Accounts = () => {
@@ -9,7 +10,8 @@ const Accounts = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
 
-
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const fetchAccounts = async () => {
     try {
@@ -54,8 +56,11 @@ const Accounts = () => {
     fetchAccounts();
   }, []);
 
-
-
+  const totalPages = Math.ceil((accounts || []).length / itemsPerPage) || 1;
+  const currentAccounts = (accounts || []).slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="page-container">
@@ -89,7 +94,7 @@ const Accounts = () => {
             </tr>
           </thead>
           <tbody>
-            {Array.isArray(accounts) && accounts.map(acc => (
+            {Array.isArray(accounts) && currentAccounts.map(acc => (
               <tr key={acc.ID_TK}>
                 <td>{acc.TenDangNhap}</td>
                 <td>{acc.VaiTro}</td>
@@ -112,6 +117,12 @@ const Accounts = () => {
             ))}
           </tbody>
         </table>
+
+        <Pagination 
+          currentPage={currentPage} 
+          totalPages={totalPages} 
+          onPageChange={setCurrentPage} 
+        />
       </main>
     </div>
   );
