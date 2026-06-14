@@ -10,6 +10,7 @@ from routers.allocation_request import allocation_request_bp
 from routers.device import device_bp
 from routers.product_category import product_category_bp
 from routers.inventory import inventory_bp
+from routers.depre import depre_bp
 
 app = Flask(__name__)
 
@@ -21,6 +22,8 @@ app.register_blueprint(allocation_request_bp, url_prefix="/api/allocation-reques
 app.register_blueprint(device_bp, url_prefix="/api/device")
 app.register_blueprint(product_category_bp, url_prefix="/api/product-category")
 app.register_blueprint(inventory_bp, url_prefix="/api/inventory")
+app.register_blueprint(depre_bp, url_prefix="/api/depreciation")
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
