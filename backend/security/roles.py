@@ -2,10 +2,14 @@ from functools import wraps
 from flask import request, jsonify
 from security.jwthandler import decode_token
 import jwt
+
 def token_and_role_required(allowed_roles=[]):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
+            if request.method == 'OPTIONS':
+                return '', 200
+
             auth_header = request.headers.get('Authorization')
             
             if not auth_header or not auth_header.startswith("Bearer "):

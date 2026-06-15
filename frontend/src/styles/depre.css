@@ -1,26 +1,43 @@
 .depreciation-container {
   padding: 24px;
+  width: 100%;
+  flex: 1; 
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
+
 
 .card {
-  background: var(--surface);
-  padding: 24px;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-tight);
-  border: 1px solid var(--line);
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
   margin-top: 20px;
+  background-color: white;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
 }
 
-.form-group {
+
+
+.filter-card {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
   margin-bottom: 20px;
 }
+.filter-card select { width: 150px; }
 
-.form-group label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--ink);
-}
+
+
+
+
+
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: var(--ink); }
 
 select, input {
   width: 100%;
@@ -30,81 +47,51 @@ select, input {
   background: var(--surface-quiet);
   color: var(--ink);
   font-size: 14px;
-  transition: border 0.2s var(--ease);
+}
+select:focus, input:focus { outline: none; border-color: var(--accent); }
+
+
+
+
+
+/* Tăng khoảng cách và làm bảng chuyên nghiệp hơn */
+.depreciation-table {
+  width: 100%;
+  border-collapse: separate; /* Thay đổi từ collapse để dùng border-radius */
+  border-spacing: 0;
+  margin-top: 10px;
 }
 
-select:focus, input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-
-.calculation-preview {
-  margin: 20px 0;
+.depreciation-table th {
+  background-color: #f8f9fa;
   padding: 16px;
-  background: var(--accent-soft);
-  border-left: 4px solid var(--accent);
-  border-radius: var(--radius-sm);
-  color: var(--accent-strong);
+  text-align: left;
+  border-bottom: 2px solid #dee2e6;
 }
 
-.calculation-preview p {
-  margin: 0;
-  font-size: 16px;
+.depreciation-table td {
+  padding: 16px;
+  border-bottom: 1px solid #eee;
 }
 
-
-.btn-primary {
-  background: var(--accent);
-  color: white;
-  padding: 12px 24px;
-  border-radius: var(--radius-sm);
-  border: none;
-  cursor: pointer;
+.depreciation-table td:nth-child(3), 
+.depreciation-table th:nth-child(3) {
+  text-align: right;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; /* Giúp số tiền nhìn thẳng hàng hơn */
   font-weight: 600;
-  transition: background 0.3s var(--ease);
 }
 
-.btn-primary:hover {
-  background: var(--accent-strong);
+.depreciation-table tr:hover {
+  background-color: #f0f7ff;
+  cursor: pointer;
 }
-
-.btn-primary:disabled {
-  background: var(--ink-muted);
-  cursor: not-allowed;
+.btn-primary {
+  background: var(--accent); color: white; padding: 12px 24px;
+  border-radius: var(--radius-sm); border: none; cursor: pointer; font-weight: 600;
 }
+.btn-primary:disabled { background: var(--ink-muted); }
 
-.form-group {
-    margin-bottom: 15px;
-}
-
-.form-group label {
-    display: block;
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #333;
-}
-
-.form-group input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-
-.history-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
-}
-
-.history-table th, .history-table td {
-    padding: 12px;
-    border-bottom: 1px solid #eee;
-    text-align: left;
-}
-
-.history-table th {
-    background-color: #f8f9fa;
-    font-weight: 600;
+.chart-container {
+  margin-top: 20px; padding: 20px; background: white;
+  border-radius: 8px; border: 1px solid #ddd;
 }

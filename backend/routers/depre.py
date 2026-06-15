@@ -48,18 +48,49 @@ def get_report():
 
 
 
-@token_and_role_required(allowed_roles=["ADMIN"])
+
+@depre_bp.route("/history/<int:ma_tb>", methods=["GET", "OPTIONS"]) 
+@token_and_role_required(allowed_roles=["ADMIN", "USER"])
 def get_depreciation_history(ma_tb):
+
+    if request.method == 'OPTIONS':
+        return '', 200
+        
     try:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
         
-        
-        query = "SELECT Thang, Nam, SoTien, NgayChot FROM LICHSUKHAUHAO WHERE MaTB = %s ORDER BY Nam DESC, Thang DESC"
+        query = "SELECT Thang, Nam, GiaTriConLai, GiaTriKhauHaoThang FROM LICHSUKHAUHAO WHERE ID_TB = %s ORDER BY Nam DESC, Thang DESC"
         cursor.execute(query, (ma_tb,))
         history = cursor.fetchall()
+        
         cursor.close()
         conn.close()
         return jsonify(history), 200
     except Exception as e:
         return jsonify({"message": f"Lỗi truy vấn lịch sử: {str(e)}"}), 500
+    
+@depre_bp.route("/report-by-month", methods=["GET"])
+@token_and_role_required(allowed_roles=["ADMIN"])
+def get_report_by_month():
+    thang = request.args.get("thang")
+    nam = request.args.get("nam")
+    
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        sql = """
+            SELECT t.ID_TB as MaTB, t.TenThietBi, l.GiaTriKhauHaoThang, l.GiaTriLuyKe, l.GiaTriConLai
+            FROM LICHSUKHAUHAO l
+            JOIN THIETBI t ON l.ID_TB = t.ID_TB
+            WHERE l.Thang = %s AND l.Nam = %s
+        """
+        cursor.execute(sql, (thang, nam))
+        data = cursor.fetchall()
+        return jsonify(data), 200
+    except Exception as e:
+        print(f"Lỗi truy vấn SQL: {e}")
+        return jsonify({"message": "Lỗi dữ liệu: " + str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()

@@ -45,5 +45,17 @@ const fetchDevices = useCallback(async () => {
         } catch { setFormData({ method: "straight-line", usefulLife: 5, residualValue: 0 }); }
     };
 
-    return { devices, formData, setFormData, fetchDevices, calculatePreview, saveConfig, fetchConfig };
+    const fetchHistory = async (maTB) => {
+    try {
+        const res = await axios.get(`http://127.0.0.1:5000/api/depreciation/history/${maTB}`, 
+            { headers: { Authorization: `Bearer ${token}` } });
+        return res.data || [];
+    } catch (err) {
+        console.error("Lỗi lấy lịch sử:", err);
+        return [];
+    }
+};
+
+return { devices, formData, setFormData, fetchDevices, calculatePreview, saveConfig, fetchConfig, fetchHistory };
+
 };

@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from database.db import get_connection
 from models.devices import (
     get_devices_paginated,
     get_device_by_id,
@@ -64,28 +65,38 @@ def get_device_detail(matb):
         return jsonify({"message": str(e)}), 500
 
 
-@device_bp.route("/create", methods=["POST"])
-@token_and_role_required(allowed_roles=["ADMIN"])
-def add_device():
+def create_device(data):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
     try:
-        data = request.json or {}
-        required = ["TenThietBi", "LoaiThietBi"]
-        for field in required:
-            if not str(data.get(field, "")).strip():
-                return jsonify({"message": f"{field} không được để trống."}), 400
-
-        device_id = create_device(data)
-        return jsonify({
-            "message": "Thêm thiết bị thành công.",
-            "MaThietBi": str(device_id),
-        }), 201
-
-    except ValueError as e:
-        return jsonify({"message": str(e)}), 400
+        # 1. Thêm thiết bị
+        sql_device = "INSERT INTO THIETBI (TenThietBi, ID_DM, NguyenGia, TrangThai) VALUES (%s, %s, %s, 'Mới')"
+        cursor.execute(sql_device, (data['TenThietBi'], data['LoaiThietBi'], data.get('NguyenGia', 0)))
+        new_device_id = cursor.lastrowid
+        
+        # 2. Lấy thông tin từ danh mục sản phẩm (nếu không có thì lấy mặc định)
+        cursor.execute("SELECT ThoiGianKhauHao FROM DANHMUCSANPHAM WHERE ID_DM = %s", (data['LoaiThietBi'],))
+        row = cursor.fetchone()
+        thoi_gian = row['ThoiGianKhauHao'] if row else 5 # Mặc định 5 năm nếu không tìm thấy
+        
+        # 3. Insert trực tiếp (An toàn hơn dùng JOIN)
+        sql_depre = """
+            INSERT INTO KHAUHAO (ID_TB, PhuongPhapTinh, ThoiGianSuDung, GiaTriThuHoi, GiaTriBanDau)
+            VALUES (%s, 'straight-line', %s, 0, %s)
+        """
+        cursor.execute(sql_depre, (new_device_id, thoi_gian, data.get('NguyenGia', 0)))
+        
+        conn.commit()
+        return new_device_id
     except Exception as e:
-        return jsonify({"message": "Có lỗi hệ thống xảy ra."}), 500
-
-
+        conn.rollback()
+        print(f"Lỗi chi tiết: {e}") # XEM DÒNG NÀY Ở TERMINAL
+        raise e
+    finally:
+        cursor.close()
+        conn.close()
+        
+        
 @device_bp.route("/update/<int:matb>", methods=["PUT"])
 @token_and_role_required(allowed_roles=["ADMIN"])
 def edit_device(matb):
