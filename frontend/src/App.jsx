@@ -12,7 +12,7 @@ import Depreciation from "./pages/depreciation";
 
 function ProtectedDashboard() {
   const role = (localStorage.getItem("role") || "").toUpperCase();
-  if (role === "ADMIN") return <Navigate to="/devices" replace />;
+  if (role === "USER") return <Navigate to="/devices" replace />;
   return <Dashboard />;
 }
 
