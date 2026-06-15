@@ -283,6 +283,28 @@ export default function Inventory() {
   const totalHistoryPages = Math.ceil(filteredHistory.length / itemsPerPage) || 1;
   const currentHistory = filteredHistory.slice((currentPageHistory - 1) * itemsPerPage, currentPageHistory * itemsPerPage);
 
+  const filteredBatchDetail = useMemo(() => {
+    let list = batchDevices;
+    if (searchBatchDetail) {
+      const lowerSearch = searchBatchDetail.toLowerCase();
+      list = list.filter(d => 
+        (d.TenThietBi || "").toLowerCase().includes(lowerSearch) ||
+        (d.MaThietBi || "").toLowerCase().includes(lowerSearch) ||
+        (d.SeriNumber || "").toLowerCase().includes(lowerSearch)
+      );
+    }
+    if (batchDetailCategoryFilter) {
+      list = list.filter(d => d.TenDanhMuc === batchDetailCategoryFilter || d.LoaiThietBi === batchDetailCategoryFilter);
+    }
+    if (batchDetailStatusFilter) {
+      list = list.filter(d => d.TrangThai === batchDetailStatusFilter);
+    }
+    return sortRows(list, sortBatchDetail);
+  }, [batchDevices, searchBatchDetail, batchDetailCategoryFilter, batchDetailStatusFilter, sortBatchDetail]);
+
+  const totalBatchDetailPages = Math.ceil(filteredBatchDetail.length / itemsPerPage) || 1;
+  const currentBatchDetail = filteredBatchDetail.slice((currentPageBatchDetail - 1) * itemsPerPage, currentPageBatchDetail * itemsPerPage);
+
   // ── Nhập kho Modal (Batch Input / Excel) ──────────────────────────
   const openImport = () => {
     setImportBatchId(generateBatchId());
