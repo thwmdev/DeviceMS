@@ -371,6 +371,22 @@ export default function Devices() {
               </th>
               <th>
                 <SortableHeader
+                  label="Đợt nhập"
+                  sortKey="MaDot"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Đợt thanh lý"
+                  sortKey="MaDotThanhLy"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              <th>
+                <SortableHeader
                   label="Ngày mua"
                   sortKey="NgayMua"
                   sortConfig={sortConfig}
@@ -400,11 +416,11 @@ export default function Devices() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={isUser ? 8 : 9}>Đang tải dữ liệu...</td>
+                <td colSpan={isUser ? 10 : 11}>Đang tải dữ liệu...</td>
               </tr>
             ) : currentDevices.length === 0 ? (
               <tr>
-                <td colSpan={isUser ? 8 : 9}>Không có dữ liệu</td>
+                <td colSpan={isUser ? 10 : 11}>Không có dữ liệu</td>
               </tr>
             ) : (
               currentDevices.map((device) => (
@@ -413,6 +429,8 @@ export default function Devices() {
                   <td>{device.TenThietBi}</td>
                   <td><code style={{ fontStyle: "normal", color: "var(--ink-soft)" }}>{device.SeriNumber || "-"}</code></td>
                   <td>{device.LoaiThietBi}</td>
+                  <td>{device.MaDot || "-"}</td>
+                  <td>{device.MaDotThanhLy || "-"}</td>
                   <td>{device.NgayMua ? new Date(device.NgayMua).toLocaleDateString("vi-VN") : "-"}</td>
                   <td>
                     {device.GiaTri !== null && device.GiaTri !== ""

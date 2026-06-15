@@ -135,6 +135,7 @@ def map_to_frontend(db_device):
         "GiaTri": float(db_device["NguyenGia"]) if db_device["NguyenGia"] is not None else None,
         "TrangThai": normalize_status_for_frontend(db_device["TrangThai"]),
         "MaDot": db_device.get("MaDot") or "",
+        "MaDotThanhLy": db_device.get("MaDotThanhLy") or "",
         "NguoiSuDung": db_device.get("NguoiSuDung") or "",
     }
 
@@ -160,9 +161,9 @@ def get_devices_paginated(page=1, limit=10, search="", batch_id="", dispose_batc
             params.append(employee_id)
 
         if search:
-            where_clause += " AND (CAST(t.ID_TB AS CHAR) LIKE %s OR t.TenThietBi LIKE %s OR t.SeriNumber LIKE %s)"
+            where_clause += " AND (CAST(t.ID_TB AS CHAR) LIKE %s OR t.TenThietBi LIKE %s OR t.SeriNumber LIKE %s OR t.MaDot LIKE %s OR t.MaDotThanhLy LIKE %s)"
             keyword = f"%{search}%"
-            params.extend([keyword, keyword, keyword])
+            params.extend([keyword, keyword, keyword, keyword, keyword])
 
         if batch_id:
             where_clause += " AND t.MaDot = %s"
