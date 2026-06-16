@@ -63,6 +63,12 @@ def get_depreciation_history(ma_tb):
         query = "SELECT Thang, Nam, GiaTriConLai, GiaTriKhauHaoThang FROM LICHSUKHAUHAO WHERE ID_TB = %s ORDER BY Nam DESC, Thang DESC"
         cursor.execute(query, (ma_tb,))
         history = cursor.fetchall()
+        # Convert Decimal to float for JSON serialization
+        from decimal import Decimal
+        for row in history:
+            for key, val in row.items():
+                if isinstance(val, Decimal):
+                    row[key] = float(val)
         
         cursor.close()
         conn.close()
@@ -80,13 +86,21 @@ def get_report_by_month():
     cursor = conn.cursor(dictionary=True)
     try:
         sql = """
-            SELECT t.ID_TB as MaTB, t.TenThietBi, l.GiaTriKhauHaoThang, l.GiaTriLuyKe, l.GiaTriConLai
+            SELECT t.ID_TB as MaTB, t.TenThietBi, t.NguyenGia, k.GiaTriBanDau,
+                   l.GiaTriKhauHaoThang, l.GiaTriLuyKe, l.GiaTriConLai
             FROM LICHSUKHAUHAO l
             JOIN THIETBI t ON l.ID_TB = t.ID_TB
+            LEFT JOIN KHAUHAO k ON t.ID_TB = k.ID_TB
             WHERE l.Thang = %s AND l.Nam = %s
         """
         cursor.execute(sql, (thang, nam))
         data = cursor.fetchall()
+        # Convert Decimal to float for JSON serialization
+        from decimal import Decimal
+        for row in data:
+            for key, val in row.items():
+                if isinstance(val, Decimal):
+                    row[key] = float(val)
         return jsonify(data), 200
     except Exception as e:
         print(f"Lỗi truy vấn SQL: {e}")
