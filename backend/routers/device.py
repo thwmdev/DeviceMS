@@ -67,33 +67,77 @@ def get_device_detail(matb):
         return jsonify({"message": str(e)}), 500
 
 
-def create_device(data):
+@device_bp.route("/create", methods=["POST"])
+@token_and_role_required(allowed_roles=["ADMIN"])
+def add_device():
+    """Tạo thiết bị mới và tự động tạo cấu hình khấu hao từ danh mục."""
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        # 1. Thêm thiết bị
-        sql_device = "INSERT INTO THIETBI (TenThietBi, ID_DM, NguyenGia, TrangThai) VALUES (%s, %s, %s, 'Mới')"
-        cursor.execute(sql_device, (data['TenThietBi'], data['LoaiThietBi'], data.get('NguyenGia', 0)))
-        new_device_id = cursor.lastrowid
-        
-        # 2. Lấy thông tin từ danh mục sản phẩm (nếu không có thì lấy mặc định)
-        cursor.execute("SELECT ThoiGianKhauHao FROM DANHMUCSANPHAM WHERE ID_DM = %s", (data['LoaiThietBi'],))
-        row = cursor.fetchone()
-        thoi_gian = row['ThoiGianKhauHao'] if row else 5 # Mặc định 5 năm nếu không tìm thấy
-        
-        # 3. Insert trực tiếp (An toàn hơn dùng JOIN)
-        sql_depre = """
+        data = request.json or {}
+        if not data.get("TenThietBi") or not data.get("LoaiThietBi"):
+            return jsonify({"message": "Tên và loại thiết bị không được để trống."}), 400
+
+        ten_danh_muc = str(data["LoaiThietBi"]).strip()
+
+        # 1. Tra cứu danh mục theo tên để lấy ID_DM và ThoiGianKhauHao
+        cursor.execute(
+            "SELECT ID_DM, ThoiGianKhauHao FROM DANHMUCSANPHAM WHERE TenDanhMuc = %s AND TrangThai = 'HoatDong'",
+            (ten_danh_muc,)
+        )
+        dm_row = cursor.fetchone()
+        id_dm = dm_row["ID_DM"] if dm_row else None
+        # Ưu tiên: ThoiGianKhauHao từ danh mục → mặc định 5
+        thoi_gian = int(dm_row["ThoiGianKhauHao"]) if (dm_row and dm_row["ThoiGianKhauHao"]) else 5
+
+        # 2. Tạo thiết bị — lưu cả Loai (tên) và ID_DM (khoá ngoại)
+        nguyen_gia = data.get("GiaTri") or data.get("NguyenGia") or 0
+        ma_dot     = str(data.get("MaDot") or "").strip() or None
+        seri       = str(data.get("SeriNumber") or "").strip() or None
+
+        from models.devices import normalize_status_for_db
+        trang_thai = normalize_status_for_db(data.get("TrangThai", "SanSang"))
+
+        # Lấy ID tự tăng tiếp theo
+        cursor.execute("SELECT COALESCE(MAX(ID_TB), 0) + 1 FROM THIETBI")
+        device_id = cursor.fetchone()["COALESCE(MAX(ID_TB), 0) + 1"]
+
+        cursor.execute(
+            """
+            INSERT INTO THIETBI (ID_TB, TenThietBi, Loai, ID_DM, SeriNumber, NgayMua, NguyenGia, TrangThai, MaDot)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                device_id,
+                data["TenThietBi"],
+                ten_danh_muc,
+                id_dm,
+                seri,
+                data.get("NgayMua") or None,
+                nguyen_gia,
+                trang_thai,
+                ma_dot,
+            ),
+        )
+
+        # 3. Tạo bản ghi KHAUHAO mặc định từ danh mục
+        cursor.execute(
+            """
             INSERT INTO KHAUHAO (ID_TB, PhuongPhapTinh, ThoiGianSuDung, GiaTriThuHoi, GiaTriBanDau)
             VALUES (%s, 'straight-line', %s, 0, %s)
-        """
-        cursor.execute(sql_depre, (new_device_id, thoi_gian, data.get('NguyenGia', 0)))
-        
+            ON DUPLICATE KEY UPDATE
+                ThoiGianSuDung = VALUES(ThoiGianSuDung),
+                GiaTriBanDau   = VALUES(GiaTriBanDau)
+            """,
+            (device_id, thoi_gian, nguyen_gia),
+        )
+
         conn.commit()
-        return new_device_id
+        return jsonify({"message": "Thêm thiết bị thành công.", "ID_TB": device_id}), 201
     except Exception as e:
         conn.rollback()
-        print(f"Lỗi chi tiết: {e}") # XEM DÒNG NÀY Ở TERMINAL
-        raise e
+        print(f"Lỗi tạo thiết bị: {e}")
+        return jsonify({"message": f"Lỗi hệ thống: {str(e)}"}), 500
     finally:
         cursor.close()
         conn.close()
@@ -189,33 +233,44 @@ def update_device_life(matb):
         logging.info(f"Đang cập nhật thiết bị {matb} với kh {new_life}")
                     
   
+
         if new_life is None or int(new_life) <= 0:
             return jsonify({"message": "Thời gian sử dụng phải là số dương."}), 400
+
+        new_life = int(new_life)
+        # reset_history=true → xóa LICHSUKHAUHAO để tính lại từ đầu
+        reset_history = data.get("reset_history", False)
 
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("SELECT ThoiGianSuDung FROM KHAUHAO WHERE ID_TB = %s", (matb,))
         result = cursor.fetchone()
-        
+
         if not result:
-            return jsonify({"message": "Không tìm thấy thông tin khấu hao của thiết bị."}), 404
-            
-        gia_tri_cu = result['ThoiGianSuDung']
-        
-        cursor.execute("UPDATE KHAUHAO SET ThoiGianSuDung = %s WHERE ID_TB = %s", (new_life, matb))
-        
-        cursor.execute("""
-            INSERT INTO AUDIT_LOG (MaTB, HanhDong, GiaTriCu, GiaTriMoi, NguoiSua)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (str(matb), "Cap nhat thoi gian", str(gia_tri_cu), str(new_life), "Admin"))
-        
+            cursor.execute("""
+                INSERT INTO KHAUHAO (ID_TB, PhuongPhapTinh, ThoiGianSuDung, GiaTriThuHoi, GiaTriBanDau)
+                VALUES (%s, 'straight-line', %s, 0, (SELECT NguyenGia FROM THIETBI WHERE ID_TB = %s))
+            """, (matb, new_life, matb))
+        else:
+            cursor.execute("UPDATE KHAUHAO SET ThoiGianSuDung = %s WHERE ID_TB = %s", (new_life, matb))
+
+        msg = f"Cập nhật thời gian khấu hao thành {new_life} năm thành công."
+
+        if reset_history:
+            cursor.execute("DELETE FROM LICHSUKHAUHAO WHERE ID_TB = %s", (matb,))
+            msg += " Đã xóa lịch sử — khấu hao sẽ được tính lại từ đầu khi chạy tháng tiếp theo."
+        else:
+            msg += " Thay đổi áp dụng từ tháng chưa tính tiếp theo (lịch sử cũ giữ nguyên)."
+
         conn.commit()
-        return jsonify({"message": "Cập nhật thành công."}), 200
-            
+        return jsonify({"message": msg}), 200
+
     except Exception as e:
-        print(f"DEBUG ERROR: {e}") # Lỗi sẽ hiện ở đây
+        print(f"DEBUG ERROR: {e}")
         return jsonify({"message": f"Lỗi hệ thống: {str(e)}"}), 500
     finally:
-        cursor.close()
-        conn.close()
+        if 'cursor' in dir() and cursor:
+            cursor.close()
+        if 'conn' in dir() and conn:
+            conn.close()

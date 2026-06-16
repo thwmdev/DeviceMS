@@ -137,6 +137,7 @@ def map_to_frontend(db_device):
         "MaDot": db_device.get("MaDot") or "",
         "MaDotThanhLy": db_device.get("MaDotThanhLy") or "",
         "NguoiSuDung": db_device.get("NguoiSuDung") or "",
+        "ThoiGianKhauHao": db_device.get("ThoiGianKhauHao"),
     }
 
 
@@ -178,7 +179,8 @@ def get_devices_paginated(page=1, limit=10, search="", batch_id="", dispose_batc
         total = cursor.fetchone()["total"]
 
         data_query = f"""
-            SELECT t.*, 
+            SELECT t.*,
+                   d.ThoiGianKhauHao,
                    (SELECT n.HoTen 
                     FROM LICHSUCAPPHAT cp 
                     JOIN NHANVIEN n ON cp.ID_NV = n.ID_NV 
@@ -186,6 +188,7 @@ def get_devices_paginated(page=1, limit=10, search="", batch_id="", dispose_batc
                       AND (cp.TrangThai IS NULL OR cp.TrangThai NOT IN ('DaThuHoi', 'ThuHoi')) 
                     ORDER BY cp.NgayCap DESC LIMIT 1) AS NguoiSuDung
             FROM {TABLE_NAME} t
+            LEFT JOIN DANHMUCSANPHAM d ON t.ID_DM = d.ID_DM
             {where_clause}
             ORDER BY t.ID_TB ASC
             LIMIT %s OFFSET %s
@@ -261,6 +264,7 @@ def get_device_by_id(matb):
 
 
 def create_device(data):
+    """Tạo thiết bị mới, gán ID_DM và tự tạo bản ghi KHAUHAO từ danh mục."""
     _ensure_device_columns()
     conn = None
     cursor = None
@@ -269,42 +273,69 @@ def create_device(data):
         if not conn:
             raise Exception("Khong the ket noi co so du lieu.")
 
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=True)
 
-        cursor.execute(f"SELECT COALESCE(MAX(ID_TB), 0) + 1 FROM {TABLE_NAME}")
-        device_id = cursor.fetchone()[0]
-
-        seri = str(data.get("SeriNumber") or "").strip() or None
+        seri   = str(data.get("SeriNumber") or "").strip() or None
         ma_dot = str(data.get("MaDot") or "").strip() or None
+        ten_danh_muc = str(data["LoaiThietBi"]).strip()
+        nguyen_gia = data.get("GiaTri") or data.get("NguyenGia") or 0
 
-        # Auto create category if not exists
-        loai_thiet_bi = str(data["LoaiThietBi"]).strip()
-        if loai_thiet_bi:
-            cursor.execute("SELECT ID_DM FROM DANHMUCSANPHAM WHERE TenDanhMuc = %s", (loai_thiet_bi,))
-            if not cursor.fetchone():
-                import uuid
-                ma_danh_muc = f"DM_{str(uuid.uuid4())[:6].upper()}"
-                cursor.execute(
-                    "INSERT INTO DANHMUCSANPHAM (MaDanhMuc, TenDanhMuc, TrangThai, MaDot) VALUES (%s, %s, 'HoatDong', %s)",
-                    (ma_danh_muc, loai_thiet_bi, ma_dot)
-                )
+        # --- 1. Tra cứu / tạo danh mục, lấy ID_DM + ThoiGianKhauHao ---
+        cursor.execute(
+            "SELECT ID_DM, ThoiGianKhauHao FROM DANHMUCSANPHAM WHERE TenDanhMuc = %s",
+            (ten_danh_muc,)
+        )
+        dm_row = cursor.fetchone()
 
+        if dm_row:
+            id_dm    = dm_row["ID_DM"]
+            thoi_gian = int(dm_row["ThoiGianKhauHao"]) if dm_row["ThoiGianKhauHao"] else 5
+        else:
+            # Danh mục chưa tồn tại → tự tạo, dùng mặc định 5 năm
+            import uuid
+            ma_danh_muc = f"DM_{str(uuid.uuid4())[:6].upper()}"
+            cursor.execute(
+                "INSERT INTO DANHMUCSANPHAM (MaDanhMuc, TenDanhMuc, TrangThai, MaDot) VALUES (%s, %s, 'HoatDong', %s)",
+                (ma_danh_muc, ten_danh_muc, ma_dot)
+            )
+            id_dm     = cursor.lastrowid
+            thoi_gian = 5
+
+        # --- 2. Lấy ID tiếp theo ---
+        cursor.execute(f"SELECT COALESCE(MAX(ID_TB), 0) + 1 AS next_id FROM {TABLE_NAME}")
+        device_id = cursor.fetchone()["next_id"]
+
+        # --- 3. INSERT THIETBI với cả Loai (tên) và ID_DM (khoá ngoại) ---
         cursor.execute(
             f"""
-            INSERT INTO {TABLE_NAME} (ID_TB, TenThietBi, Loai, SeriNumber, NgayMua, NguyenGia, TrangThai, MaDot)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO {TABLE_NAME} (ID_TB, TenThietBi, Loai, ID_DM, SeriNumber, NgayMua, NguyenGia, TrangThai, MaDot)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 device_id,
                 data["TenThietBi"],
-                data["LoaiThietBi"],
+                ten_danh_muc,
+                id_dm,
                 seri,
                 data.get("NgayMua") or None,
-                data.get("GiaTri") or None,
+                nguyen_gia,
                 normalize_status_for_db(data.get("TrangThai", "SanSang")),
                 ma_dot,
             ),
         )
+
+        # --- 4. Tạo bản ghi KHAUHAO tự động từ ThoiGianKhauHao của danh mục ---
+        cursor.execute(
+            """
+            INSERT INTO KHAUHAO (ID_TB, PhuongPhapTinh, ThoiGianSuDung, GiaTriThuHoi, GiaTriBanDau)
+            VALUES (%s, 'straight-line', %s, 0, %s)
+            ON DUPLICATE KEY UPDATE
+                ThoiGianSuDung = VALUES(ThoiGianSuDung),
+                GiaTriBanDau   = VALUES(GiaTriBanDau)
+            """,
+            (device_id, thoi_gian, nguyen_gia),
+        )
+
         conn.commit()
         return device_id
     except Exception:

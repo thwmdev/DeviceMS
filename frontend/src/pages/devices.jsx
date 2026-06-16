@@ -395,6 +395,14 @@ export default function Devices() {
               </th>
               <th>
                 <SortableHeader
+                  label="KH mặc định"
+                  sortKey="ThoiGianKhauHao"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              <th>
+                <SortableHeader
                   label="Giá trị"
                   sortKey="GiaTri"
                   sortConfig={sortConfig}
@@ -432,6 +440,13 @@ export default function Devices() {
                   <td>{device.MaDot || "-"}</td>
                   <td>{device.MaDotThanhLy || "-"}</td>
                   <td>{device.NgayMua ? new Date(device.NgayMua).toLocaleDateString("vi-VN") : "-"}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    {device.ThoiGianKhauHao ? (
+                      <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>
+                        {device.ThoiGianKhauHao} năm
+                      </span>
+                    ) : "-"}
+                  </td>
                   <td>
                     {device.GiaTri !== null && device.GiaTri !== ""
                       ? `${Number(device.GiaTri).toLocaleString("vi-VN")} ₫`
