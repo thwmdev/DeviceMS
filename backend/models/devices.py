@@ -302,27 +302,14 @@ def create_device(data):
             thoi_gian = 5
 
         # --- 2. Lấy ID tiếp theo ---
-        cursor.execute(f"SELECT COALESCE(MAX(ID_TB), 0) + 1 AS next_id FROM {TABLE_NAME}")
-        device_id = cursor.fetchone()["next_id"]
-
-        # --- 3. INSERT THIETBI với cả Loai (tên) và ID_DM (khoá ngoại) ---
         cursor.execute(
             f"""
-            INSERT INTO {TABLE_NAME} (ID_TB, TenThietBi, Loai, ID_DM, SeriNumber, NgayMua, NguyenGia, TrangThai, MaDot)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO {TABLE_NAME} (TenThietBi, Loai, ID_DM, SeriNumber, NgayMua, NguyenGia, TrangThai, MaDot)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (
-                device_id,
-                data["TenThietBi"],
-                ten_danh_muc,
-                id_dm,
-                seri,
-                data.get("NgayMua") or None,
-                nguyen_gia,
-                normalize_status_for_db(data.get("TrangThai", "SanSang")),
-                ma_dot,
-            ),
+            (data["TenThietBi"], ten_danh_muc, id_dm, seri, data.get("NgayMua") or None, nguyen_gia, normalize_status_for_db(data.get("TrangThai", "SanSang")), ma_dot),
         )
+        device_id = cursor.lastrowid
 
         # --- 4. Tạo bản ghi KHAUHAO tự động từ ThoiGianKhauHao của danh mục ---
         cursor.execute(
@@ -357,23 +344,13 @@ def update_device(matb, data):
         if not conn:
             raise Exception("Khong the ket noi co so du lieu.")
 
-        new_device_id = parse_device_id(data["MaThietBi"])
         cursor = conn.cursor()
-
-        cursor.execute(
-            f"SELECT ID_TB FROM {TABLE_NAME} WHERE ID_TB = %s AND ID_TB != %s",
-            (new_device_id, matb),
-        )
-        if cursor.fetchone():
-            raise ValueError("Ma thiet bi da duoc dung boi thiet bi khac.")
-
         seri = str(data.get("SeriNumber") or "").strip() or None
 
         cursor.execute(
             f"""
             UPDATE {TABLE_NAME}
-            SET ID_TB = %s,
-                TenThietBi = %s,
+            SET TenThietBi = %s,
                 Loai = %s,
                 SeriNumber = %s,
                 NgayMua = %s,
@@ -382,7 +359,6 @@ def update_device(matb, data):
             WHERE ID_TB = %s
             """,
             (
-                new_device_id,
                 data["TenThietBi"],
                 data["LoaiThietBi"],
                 seri,
@@ -402,7 +378,6 @@ def update_device(matb, data):
             cursor.close()
         if conn:
             conn.close()
-
 
 def soft_delete_device(matb):
     conn = None

@@ -15,7 +15,7 @@ device_bp = Blueprint("device", __name__)
 
 
 
-VIEW_ROLES = ["ADMIN", "HR", "NHANVIEN"]
+VIEW_ROLES = ["ADMIN", "HR", "USER"]
 
 
 @device_bp.route("/list", methods=["GET"])

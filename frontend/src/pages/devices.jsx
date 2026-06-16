@@ -33,6 +33,8 @@ export default function Devices() {
   // Role
   const role = (localStorage.getItem("role") || "").toUpperCase();
   const isUser = role === "USER";
+  const isHR = role === "HR";
+  const isAdmin = role === "ADMIN";
 
   // List state
   const [devices, setDevices] = useState([]);
@@ -428,7 +430,7 @@ export default function Devices() {
               </tr>
             ) : currentDevices.length === 0 ? (
               <tr>
-                <td colSpan={isUser ? 10 : 11}>Không có dữ liệu</td>
+                <td colSpan={isUser ? 10 : 11}>Không có thiết bị.</td>
               </tr>
             ) : (
               currentDevices.map((device) => (
@@ -460,12 +462,19 @@ export default function Devices() {
                   <td>
                     {device.TrangThai === "DA_CAP_PHAT" ? (device.NguoiSuDung || "-") : "-"}
                   </td>
-                  {!isUser && (
+                  {isAdmin && (
                     <td>
                       <div className="table-actions">
                         <button className="btn-edit" onClick={() => handleOpenEditModal(device)} disabled={loading}>
                           Sửa
                         </button>
+                      </div>
+                    </td>
+                  )}
+                  {isHR &&(
+                    <td>
+                      <div className="table-actions">
+                        <span className="table-muted">Chỉ xem</span>
                       </div>
                     </td>
                   )}
@@ -503,9 +512,10 @@ export default function Devices() {
                   <div className="form-group">
                     <label>Mã thiết bị <span>*</span></label>
                     <input
-                      type="number"
+                      type="text"
                       value={editForm.MaThietBi}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, MaThietBi: e.target.value }))}
+                      disabled
+                      style={{ backgroundColor: "var(--bg-light)", cursor: "not-allowed", opacity: 0.8 }}
                     />
                   </div>
                   <div className="form-group">
