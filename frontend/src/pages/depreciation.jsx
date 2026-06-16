@@ -37,7 +37,7 @@ const handleRunDepreciation = async () => {
       const response = await axios({
         method: 'post',
         url: 'http://127.0.0.1:5000/api/depreciation/run-monthly',
-        data: payload, // Đây là Body
+        data: payload, 
         headers: { 
           'Authorization': `Bearer ${localStorage.getItem("token")}`,
           'Content-Type': 'application/json' // Bắt buộc để Backend nhận dạng được JSON
