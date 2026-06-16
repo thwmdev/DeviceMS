@@ -56,3 +56,14 @@ def toggle_account_status(matk):
         return jsonify({"message": "Cập nhật trạng thái tài khoản thành công!"}), 200
     except Exception as e:
         return jsonify({"message": "Có lỗi hệ thống xảy ra!"}), 500
+    
+    
+@account_bp.route("/reset-password/<int:matk>", methods=["PUT"])
+@token_and_role_required(allowed_roles=["ADMIN"])
+def reset_password(matk):
+    try:
+        default_password = "123456"
+        update_account_db(matk, {"MatKhau": default_password})
+        return jsonify({"message": "Đã reset về mật khẩu mặc định 123456!"}), 200
+    except Exception as e:
+        return jsonify({"message": "Lỗi hệ thống!"}), 500
