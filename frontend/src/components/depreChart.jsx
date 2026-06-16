@@ -32,7 +32,7 @@ const DepreciationChart = ({ data, xKey = "Thang", yKey = "TongKhauHaoThang" }) 
           formatter={(value) => [formatCurrency(value), "Khấu hao"]}
           cursor={{ fill: '#f0f0f0' }}
         />
-        <Bar dataKey={yKey} fill="#2563eb" radius={[4, 4, 0, 0]}>
+        <Bar dataKey={yKey} fill="#128475" radius={[4, 4, 0, 0]}>
           {data.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={index % 2 === 0 ? "#2563eb" : "#60a5fa"} />
           ))}

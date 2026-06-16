@@ -50,7 +50,7 @@ def caculate_depre():
 
         sql_get_devices = """
             SELECT t.ID_TB, t.NguyenGia, k.PhuongPhapTinh, k.ThoiGianSuDung as CauHinhRieng, 
-                   d.ThoiGianKhauHao as MacDinh
+                   k.GiaTriThuHoi, d.ThoiGianKhauHao as MacDinh
             FROM THIETBI t
             LEFT JOIN KHAUHAO k ON t.ID_TB = k.ID_TB
             JOIN DANHMUCSANPHAM d ON t.ID_DM = d.ID_DM
@@ -62,18 +62,28 @@ def caculate_depre():
             id_tb = item['ID_TB']
             nguyen_gia = float(item['NguyenGia'])
             
-            so_nam = item['CauHinhRieng'] if item['CauHinhRieng'] else item['MacDinh']
-            thoi_gian_thang = int(so_nam) * 12
+            # Lấy thông tin cấu hình
+            so_nam = float(item['CauHinhRieng'] if item['CauHinhRieng'] else item['MacDinh'])
+            phuong_phap = item['PhuongPhapTinh'] or 'straight-line'
+            gia_tri_thu_hoi = float(item['GiaTriThuHoi'] or 0)
             
-            khau_hao_thang_chuan = nguyen_gia / thoi_gian_thang
-            
+            # Tính lũy kế
             cursor.execute("SELECT SUM(GiaTriKhauHaoThang) as LuyKe FROM LICHSUKHAUHAO WHERE ID_TB = %s", (id_tb,))
             luy_ke = float(cursor.fetchone()['LuyKe'] or 0)
+            gia_tri_con_lai = nguyen_gia - luy_ke
             
-            con_lai_can_khau_hao = nguyen_gia - luy_ke
-            
-            if con_lai_can_khau_hao > 0:
-                thuc_te_ghi = min(khau_hao_thang_chuan, con_lai_can_khau_hao)
+            if gia_tri_con_lai > gia_tri_thu_hoi:
+                # Logic tính toán theo phương pháp
+                if phuong_phap == 'declining-balance':
+                    # Tỷ lệ khấu hao nhanh (2x đường thẳng) chia cho 12 tháng
+                    ty_le_thang = (2 / so_nam) / 12
+                    khau_hao_thang = gia_tri_con_lai * ty_le_thang
+                else:
+                    # Phương pháp đường thẳng mặc định
+                    khau_hao_thang = (nguyen_gia - gia_tri_thu_hoi) / (so_nam * 12)
+                
+                # Đảm bảo không khấu hao vượt quá giá trị thu hồi
+                thuc_te_ghi = min(khau_hao_thang, gia_tri_con_lai - gia_tri_thu_hoi)
                 
                 cursor.execute("""
                     INSERT INTO LICHSUKHAUHAO (ID_TB, Nam, Thang, GiaTriKhauHaoThang, GiaTriLuyKe, GiaTriConLai) 

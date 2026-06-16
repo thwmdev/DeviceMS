@@ -13,7 +13,9 @@ from security.roles import token_and_role_required
 
 device_bp = Blueprint("device", __name__)
 
-VIEW_ROLES = ["ADMIN", "HR", "USER"]
+
+
+VIEW_ROLES = ["ADMIN", "HR", "NHANVIEN"]
 
 
 @device_bp.route("/list", methods=["GET"])
@@ -170,3 +172,50 @@ def dispose_batch():
     except Exception as e:
         return jsonify({"message": "Có lỗi hệ thống xảy ra."}), 500
 
+
+
+
+@device_bp.route("/update-life/<int:matb>", methods=["PUT"])
+@token_and_role_required(allowed_roles=["ADMIN"])
+def update_device_life(matb):
+    try:
+        data = request.json
+        new_life = data.get("ThoiGianSuDung")
+        
+        import logging
+
+        logging.basicConfig(level=logging.INFO)
+
+        logging.info(f"Đang cập nhật thiết bị {matb} với kh {new_life}")
+                    
+  
+        if new_life is None or int(new_life) <= 0:
+            return jsonify({"message": "Thời gian sử dụng phải là số dương."}), 400
+
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("SELECT ThoiGianSuDung FROM KHAUHAO WHERE ID_TB = %s", (matb,))
+        result = cursor.fetchone()
+        
+        if not result:
+            return jsonify({"message": "Không tìm thấy thông tin khấu hao của thiết bị."}), 404
+            
+        gia_tri_cu = result['ThoiGianSuDung']
+        
+        cursor.execute("UPDATE KHAUHAO SET ThoiGianSuDung = %s WHERE ID_TB = %s", (new_life, matb))
+        
+        cursor.execute("""
+            INSERT INTO AUDIT_LOG (MaTB, HanhDong, GiaTriCu, GiaTriMoi, NguoiSua)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (str(matb), "Cap nhat thoi gian", str(gia_tri_cu), str(new_life), "Admin"))
+        
+        conn.commit()
+        return jsonify({"message": "Cập nhật thành công."}), 200
+            
+    except Exception as e:
+        print(f"DEBUG ERROR: {e}") # Lỗi sẽ hiện ở đây
+        return jsonify({"message": f"Lỗi hệ thống: {str(e)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
