@@ -50,7 +50,6 @@ def run_monthly_depreciation():
                 SELECT ID_TB FROM LICHSUKHAUHAO WHERE Thang = %s AND Nam = %s
             )
         """
-        # Phải truyền đủ 4 tham số theo đúng thứ tự 4 dấu %s
         cursor.execute(sql, (thang, nam, thang, nam))
         conn.commit()
         return jsonify({"message": "Tính khấu hao thành công"}), 200
@@ -111,12 +110,37 @@ def get_report_by_month():
     cursor = conn.cursor(dictionary=True)
     try:
         sql = """
-            SELECT t.ID_TB as MaTB, t.TenThietBi, t.NguyenGia, 
-            COALESCE(l.GiaTriKhauHaoThang, 0) as GiaTriKhauHaoThang, 
-            COALESCE(l.GiaTriLuyKe, 0) as GiaTriLuyKe, 
-            COALESCE(l.GiaTriConLai, 0) as GiaTriConLai
-            FROM THIETBI t
-            LEFT JOIN LICHSUKHAUHAO l ON t.ID_TB = l.ID_TB AND l.Thang = %s AND l.Nam = %s  
+        SELECT
+            t.ID_TB as MaTB,
+            t.TenThietBi,
+            t.NguyenGia,
+            t.TrangThai,
+            k.ThoiGianSuDung,
+
+            COALESCE(l.GiaTriKhauHaoThang,0) as GiaTriKhauHaoThang,
+            COALESCE(l.GiaTriLuyKe,0) as GiaTriLuyKe,
+            COALESCE(l.GiaTriConLai,0) as GiaTriConLai
+
+        FROM THIETBI t
+
+        LEFT JOIN KHAUHAO k
+            ON t.ID_TB = k.ID_TB
+
+        LEFT JOIN LICHSUKHAUHAO l
+            ON t.ID_TB = l.ID_TB
+            AND l.Thang = %s
+            AND l.Nam = %s
+
+        ORDER BY
+            CASE t.TrangThai
+                WHEN 'SanSang' THEN 1
+                WHEN 'DangSuDung' THEN 2
+                WHEN 'BaoTri' THEN 3
+                WHEN 'Hong' THEN 4
+                WHEN 'ThanhLy' THEN 5
+                ELSE 99
+            END,
+            t.ID_TB
         """
         cursor.execute(sql, (thang, nam))
         data = cursor.fetchall()

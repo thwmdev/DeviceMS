@@ -16,41 +16,58 @@ export default function Depreciation() {
 
 
 
-  const fetchReport = async (thang, nam) => {
-    const token = localStorage.getItem("token");
-    try {
-      const res = await axios.get(`http://127.0.0.1:5000/api/depreciation/report-by-month?thang=${thang}&nam=${nam}`, 
-        { headers: { Authorization: `Bearer ${token}` } });
-      setReportData(res.data || []);
-    } catch (err) { alert("Lỗi tải dữ liệu báo cáo"); }
-  };
+
+const fetchReport = async (thang, nam) => {
+  console.log("fetchReport được gọi", thang, nam);
+
+  const token = localStorage.getItem("token");
+
+  try {
+    const res = await axios.get(
+      `http://127.0.0.1:5000/api/depreciation/report-by-month?thang=${thang}&nam=${nam}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    console.log("=== REPORT DATA ===");
+    console.table(res.data);
+
+    setReportData(res.data || []);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
 const handleRunDepreciation = async () => {
-    const payload = { 
-      thang: filter.thang, 
-      nam: filter.nam 
-    };
-
-    console.log("Đang gửi payload:", payload);
-
-    try {
-      const response = await axios({
-        method: 'post',
-        url: 'http://127.0.0.1:5000/api/depreciation/run-monthly',
-        data: payload, 
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem("token")}`,
-          'Content-Type': 'application/json' // Bắt buộc để Backend nhận dạng được JSON
+  try {
+    await axios.post(
+      "http://127.0.0.1:5000/api/depreciation/run-monthly",
+      {
+        thang: filter.thang,
+        nam: filter.nam
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`
         }
-      });
+      }
+    );
 
-      toast.success("Đã tính khấu hao thành công!");
-      fetchReport(filter.thang, filter.nam);
-    } catch (err) { 
-      console.error("Lỗi khi gửi API:", err);
-      toast.error("Lỗi: " + (err.response?.data?.message || "Không thể gửi dữ liệu"));
-    }
-  };
+    toast.success("Đã tính khấu hao thành công!");
+
+    await fetchReport(filter.thang, filter.nam);
+  } catch (err) {
+    console.error(err);
+
+    toast.error(
+      err.response?.data?.message ||
+      "Không thể tính khấu hao"
+    );
+  }
+};
 
   ///xuất Excel
   const exportToExcel = () => {
@@ -74,30 +91,46 @@ const handleRunDepreciation = async () => {
     conLai: acc.conLai + Number(curr.GiaTriConLai || 0)
   }), { nguyenGia: 0, khauHao: 0, luyKe: 0, conLai: 0 });
 
+  
+  
+  
+  
   const updateDeviceLife = async (maTB, newLife) => {
-    try {
-      const response = await axios.put(`http://127.0.0.1:5000/api/device/update-life/${maTB}`, 
-        { ThoiGianSuDung: newLife },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-      );
-      
-      console.log("Response:", response.data);
-      toast.success("Đã cập nhật!");
-      await fetchReport(filter.thang, filter.nam);
-      fetchReport(filter.thang, filter.nam);
-    }catch (err) { 
-      console.error("Lỗi:", err);
-      toast.error("Lỗi cập nhật: " + (err.response?.data?.message || err.message));
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    await axios.put(
+      `http://127.0.0.1:5000/api/device/update-life/${maTB}`,
+      {
+        ThoiGianSuDung: newLife
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        }
+      }
+    );
+
+    toast.success("Đã cập nhật!");
+
+    await fetchReport(filter.thang, filter.nam);
+  } catch (err) {
+    console.error(err);
+    toast.error(
+      "Lỗi cập nhật: " +
+      (err.response?.data?.message || err.message)
+    );
+  }
+};
 
 
   useEffect(() => {
     fetchReport(filter.thang, filter.nam);
   }, [filter.thang, filter.nam]);
 
+  const validData = reportData.filter(
+  item =>
+    item.ThoiGianSuDung !== null &&
+    Number(item.GiaTriKhauHaoThang) > 0
+);
 
   return (
     <div style={{ display: 'flex' }}>
@@ -137,7 +170,14 @@ const handleRunDepreciation = async () => {
 
         <div className="card" style={{ marginBottom: '20px' }}>
           <h3>Biểu đồ khấu hao thiết bị</h3>
-          <DepreciationChart data={reportData} xKey="TenThietBi" yKey="GiaTriKhauHaoThang" />
+          <DepreciationChart
+            data={validData.map(item => ({
+              ...item,
+              GiaTriKhauHaoThang: Number(item.GiaTriKhauHaoThang)
+            }))}
+            xKey="TenThietBi"
+            yKey="GiaTriKhauHaoThang"
+          />      
         </div>
         
         <div style={{ marginBottom: '20px', gap: '10px', display: 'flex' }}>
@@ -147,33 +187,50 @@ const handleRunDepreciation = async () => {
 
         <table className="depreciation-table">
           <thead>
-            <tr>
-              <th>Mã TS</th><th>Tên tài sản</th><th>Nguyên giá</th>
-              <th>KH Tháng</th><th>Lũy kế</th><th>Còn lại</th><th>% Khấu hao</th>
-            </tr>
-          </thead>
+          <tr>
+            <th>Mã TS</th>
+            <th>Tên TS</th>
+            <th>Nguyên giá</th>
+            <th>TG sử dụng</th>
+            <th>KH tháng</th>
+            <th>Lũy kế</th>
+            <th>Trạng thái</th>
+          </tr>
+        </thead>
           <tbody>
-            {reportData.map((item) => (
-              <tr key={item.MaTB}>
-                <td>{item.MaTB}</td>
-                <td>{item.TenThietBi}</td>
-                <td>{Number(item.NguyenGia || 0).toLocaleString('vi-VN')} đ</td>
-                <td>
-                  <input 
-                    type="number" 
-                    defaultValue={item.ThoiGianSuDung || 5} // Giả sử có trường này
-                    onBlur={(e) => updateDeviceLife(item.MaTB, e.target.value)}
-                    style={{ width: '60px' }}
-                  /> năm
-                </td>
-                <td>{Number(item.GiaTriKhauHaoThang || 0).toLocaleString('vi-VN')} đ</td>
-                
-                <td>{Number(item.GiaTriLuyKe || 0).toLocaleString('vi-VN')} đ</td>
-                <td>{Number(item.GiaTriConLai || 0).toLocaleString('vi-VN')} đ</td>
-                <td>{((Number(item.GiaTriLuyKe || 0)/Number(item.NguyenGia || 1))*100).toFixed(0)}%</td>
-              </tr>
-            ))}
-          </tbody>
+          {reportData.map((item) => (
+            <tr key={item.MaTB}>
+              <td>TB{String(item.MaTB).padStart(3, "0")}</td>
+              <td>{item.TenThietBi}</td>
+              <td>{Number(item.NguyenGia || 0).toLocaleString("vi-VN")} đ</td>
+
+              <td>
+                <input
+                  type="number"
+                  defaultValue={item.ThoiGianSuDung || ""}
+                  min="1"
+                  onBlur={(e) =>
+                    updateDeviceLife(item.MaTB, Number(e.target.value))
+                  }
+                  style={{ width: "70px" }}
+                />
+                {" "}năm
+              </td>
+
+              <td>
+                {Number(item.GiaTriKhauHaoThang || 0).toLocaleString("vi-VN")} đ
+              </td>
+
+              <td>
+                {Number(item.GiaTriLuyKe || 0).toLocaleString("vi-VN")} đ
+              </td>
+
+              <td>
+                {item.TrangThai || "Không xác định"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
         </table>
       </main>
     </div>
