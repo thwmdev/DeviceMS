@@ -52,6 +52,24 @@ const Accounts = () => {
     setIsModalOpen(true);
   };
 
+  const handleResetPassword = async (acc) => {
+  // Xác nhận trước khi reset
+  if (!window.confirm(`Bạn có chắc chắn muốn reset mật khẩu của ${acc.TenDangNhap} về 123456?`)) {
+    return;
+  }
+
+  try {
+    // Gọi API không cần gửi mật khẩu từ body nếu đã gán cứng ở server
+    await axios.put(`http://127.0.0.1:5000/api/account/reset-password/${acc.ID_TK}`, 
+      {}, // Gửi rỗng vì mật khẩu đã được xử lý ở server
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+    );
+    alert("Reset mật khẩu thành công!");
+  } catch (err) {
+    alert("Lỗi: " + (err.response?.data?.message || "Không thể reset mật khẩu"));
+  }
+};
+
   useEffect(() => {
     fetchAccounts();
   }, []);
@@ -107,6 +125,9 @@ const Accounts = () => {
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button className="btn-edit" onClick={() => handleEdit(acc)}>
                       Cập nhật
+                    </button>
+                    <button className="btn-action" onClick={() => handleResetPassword(acc)}>
+                      Reset Mật khẩu
                     </button>
                     <button className="btn-action" onClick={() => handleToggle(acc.ID_TK)}>
                       {acc.TrangThai === 'HoatDong' ? 'Khóa' : 'Mở khóa'}
