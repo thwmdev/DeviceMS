@@ -31,6 +31,16 @@ function MonthlyTab() {
   const [page, setPage]         = useState(1);
   const PER_PAGE = 10;
 
+  const filteredChart = useMemo(() => {
+    const now = new Date();
+    const thangHT = now.getMonth() + 1;
+    const namHT = now.getFullYear();
+
+    return chartData.filter(item =>
+      item.Nam < namHT ||
+      (item.Nam === namHT && item.Thang <= thangHT)
+    );
+  }, [chartData]);
   // Fetch
   const loadReport = async (t, n) => {
     try {
@@ -188,7 +198,7 @@ function MonthlyTab() {
       {/* Chart */}
       <div className="chart-card">
         <h3>Tổng khấu hao theo tháng (12 tháng gần nhất)</h3>
-        <TotalDepreChart data={chartData} />
+        <TotalDepreChart data={filteredChart} />
       </div>
 
       {/* Toolbar */}

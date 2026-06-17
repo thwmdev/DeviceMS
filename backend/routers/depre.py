@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from models.depreM import caculate_depre, save_depreciation, get_depreciation_detail
 from security.roles import token_and_role_required
 from database.db import get_connection
+import datetime
 
 depre_bp = Blueprint("depreciation", __name__)
 
@@ -132,19 +133,29 @@ def get_report_by_month():
 def get_chart_data():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
+
     try:
+        now = datetime.datetime.now()
+        thang_ht = now.month
+        nam_ht = now.year
+
         sql = """
             SELECT Nam, Thang, SUM(GiaTriKhauHaoThang) AS TongKhauHaoThang
             FROM LICHSUKHAUHAO
+            WHERE (Nam < %s) OR (Nam = %s AND Thang <= %s)
             GROUP BY Nam, Thang
             ORDER BY Nam ASC, Thang ASC
         """
-        cursor.execute(sql)
+
+        cursor.execute(sql, (nam_ht, nam_ht, thang_ht))
         data = cursor.fetchall()
+
         return jsonify(data), 200
+
     finally:
         cursor.close()
         conn.close()
+
 
 
 @depre_bp.route("/devices", methods=["GET"])
