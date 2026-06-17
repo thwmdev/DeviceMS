@@ -1,115 +1,212 @@
 from database.db import get_connection
 import datetime
+from datetime import date
+
 
 
 def save_depreciation(data):
+
     conn = None
     cursor = None
+
     try:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute("SELECT NguyenGia FROM THIETBI WHERE ID_TB = %s", (data['MaTB'],))
+        cursor.execute("""
+            SELECT NguyenGia, NgayMua
+            FROM THIETBI
+            WHERE ID_TB = %s
+        """, (data["MaTB"],))
+
         device = cursor.fetchone()
+
         if not device:
             raise ValueError("Không tìm thấy thiết bị.")
 
-        nguyen_gia = device['NguyenGia']
-        if float(data['residualValue']) >= float(nguyen_gia):
+        nguyen_gia = float(device["NguyenGia"])
+        ngay_mua = device["NgayMua"]
+
+        if not ngay_mua:
+            raise ValueError("Thiết bị chưa có ngày mua.")
+
+        if float(data["residualValue"]) >= nguyen_gia:
             raise ValueError("Giá trị thu hồi phải nhỏ hơn nguyên giá.")
 
+        ngay_bat_dau = ngay_mua
+
+        # FIX chuẩn ERP (không cộng tay year nữa)
+        ngay_ket_thuc = ngay_bat_dau + relativedelta(years=int(data["usefulLife"]))
+
         cursor.execute("""
-            INSERT INTO KHAUHAO (ID_TB, PhuongPhapTinh, ThoiGianSuDung, GiaTriThuHoi, GiaTriBanDau, NgayBatDau)
-            VALUES (%s, %s, %s, %s, %s, CURDATE())
+            INSERT INTO KHAUHAO (
+                ID_TB,
+                PhuongPhapTinh,
+                ThoiGianSuDung,
+                GiaTriThuHoi,
+                GiaTriBanDau,
+                NgayBatDau,
+                NgayKetThuc
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s)
             ON DUPLICATE KEY UPDATE
                 PhuongPhapTinh = VALUES(PhuongPhapTinh),
                 ThoiGianSuDung = VALUES(ThoiGianSuDung),
                 GiaTriThuHoi   = VALUES(GiaTriThuHoi),
-                GiaTriBanDau   = VALUES(GiaTriBanDau)
-        """, (data['MaTB'], data['method'], data['usefulLife'], data['residualValue'], nguyen_gia))
+                GiaTriBanDau   = VALUES(GiaTriBanDau),
+                NgayBatDau     = VALUES(NgayBatDau),
+                NgayKetThuc    = VALUES(NgayKetThuc)
+        """, (
+            data["MaTB"],
+            data["method"],
+            data["usefulLife"],
+            data["residualValue"],
+            nguyen_gia,
+            ngay_bat_dau,
+            ngay_ket_thuc
+        ))
+
         conn.commit()
+
     finally:
-        if cursor: cursor.close()
-        if conn: conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
 
 
 def caculate_depre(thang=None, nam=None):
-    """
-    Tính khấu hao tháng cho tất cả thiết bị chưa được tính trong tháng đó.
-    Thời gian sử dụng: ưu tiên cấu hình riêng (KHAUHAO), sau đó danh mục (DANHMUCSANPHAM), cuối cùng mặc định 5 năm.
-    """
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
+
     try:
         now = datetime.datetime.now()
-        if thang is None: thang = now.month
-        if nam is None: nam = now.year
 
-        # Lấy các thiết bị chưa được tính khấu hao trong tháng này
-        sql_get = """
+        if thang is None:
+            thang = now.month
+        if nam is None:
+            nam = now.year
+
+        start_month = date(nam, thang, 1)
+        end_month = date(nam, thang, calendar.monthrange(nam, thang)[1])
+
+        cursor.execute("""
             SELECT
                 t.ID_TB,
                 t.NguyenGia,
-                COALESCE(k.PhuongPhapTinh, 'straight-line')               AS PhuongPhapTinh,
-                COALESCE(k.ThoiGianSuDung, d.ThoiGianKhauHao, 5)          AS SoNam,
-                COALESCE(k.GiaTriThuHoi, 0)                                AS GiaTriThuHoi
+                COALESCE(k.PhuongPhapTinh, 'straight-line') AS PhuongPhapTinh,
+                COALESCE(k.ThoiGianSuDung, 5) AS SoNam,
+                COALESCE(k.GiaTriThuHoi, 0) AS GiaTriThuHoi,
+                k.NgayBatDau,
+                k.NgayKetThuc
             FROM THIETBI t
-            LEFT JOIN KHAUHAO        k ON t.ID_TB = k.ID_TB
-            LEFT JOIN DANHMUCSANPHAM d ON t.ID_DM  = d.ID_DM
-            WHERE t.TrangThai IN ('SanSang', 'SAN_SANG', 'DangSuDung', 'DA_CAP_PHAT', 'DaCapPhat', 'DANG_SU_DUNG')
-              AND (t.NgayMua IS NULL OR (YEAR(t.NgayMua) < %s OR (YEAR(t.NgayMua) = %s AND MONTH(t.NgayMua) <= %s)))
-              AND t.ID_TB NOT IN (
-                  SELECT ID_TB FROM LICHSUKHAUHAO WHERE Nam = %s AND Thang = %s
-              )
-        """
-        cursor.execute(sql_get, (nam, nam, thang, nam, thang))
+            LEFT JOIN KHAUHAO k ON t.ID_TB = k.ID_TB
+            WHERE t.TrangThai IN ('DangSuDung', 'DA_CAP_PHAT', 'DaCapPhat', 'DANG_SU_DUNG')
+        """)
+
         danh_sach = cursor.fetchall()
-
-        if not danh_sach:
-            return {"status": "skipped", "message": f"Tất cả thiết bị đã được tính khấu hao tháng {thang}/{nam}"}
-
         inserted = 0
-        for item in danh_sach:
-            id_tb       = item['ID_TB']
-            nguyen_gia  = float(item['NguyenGia'] or 0)
-            # Ưu tiên: KHAUHAO.ThoiGianSuDung → DANHMUCSANPHAM.ThoiGianKhauHao → 5
-            # COALESCE trong SQL đã xử lý thứ tự này; fallback Python chỉ để tránh None/0
-            so_nam      = float(item['SoNam']) if item['SoNam'] else 5
-            phuong_phap = item['PhuongPhapTinh']
-            gia_tri_thu_hoi = float(item['GiaTriThuHoi'] or 0)
 
-            # Tính lũy kế tất cả tháng trước tháng này
+        for item in danh_sach:
+
+            id_tb = item["ID_TB"]
+            nguyen_gia = float(item["NguyenGia"] or 0)
+            so_nam = float(item["SoNam"] or 5)
+            gia_tri_thu_hoi = float(item["GiaTriThuHoi"] or 0)
+            phuong_phap = item["PhuongPhapTinh"]
+
+            ngay_bat_dau = item["NgayBatDau"]
+            ngay_ket_thuc = item["NgayKetThuc"]
+
+            # =========================
+            # 1. VALID TIME RANGE
+            # =========================
+
+            if ngay_bat_dau and ngay_bat_dau > end_month:
+                continue
+
+            if ngay_ket_thuc and ngay_ket_thuc < start_month:
+                continue
+
+            # 👉 không cho chạy trước ngày mua
+            if ngay_bat_dau:
+                if (nam < ngay_bat_dau.year) or (nam == ngay_bat_dau.year and thang < ngay_bat_dau.month):
+                    continue
+
+            # =========================
+            # 2. AVOID DUPLICATE MONTH
+            # =========================
+
+            cursor.execute("""
+                SELECT 1 FROM LICHSUKHAUHAO
+                WHERE ID_TB=%s AND Nam=%s AND Thang=%s
+            """, (id_tb, nam, thang))
+
+            if cursor.fetchone():
+                continue
+
+            # =========================
+            # 3. LŨY KẾ
+            # =========================
+
             cursor.execute("""
                 SELECT COALESCE(SUM(GiaTriKhauHaoThang), 0) AS LuyKe
                 FROM LICHSUKHAUHAO
                 WHERE ID_TB = %s
                   AND (Nam < %s OR (Nam = %s AND Thang < %s))
             """, (id_tb, nam, nam, thang))
-            luy_ke = float(cursor.fetchone()['LuyKe'])
 
+            luy_ke = float(cursor.fetchone()["LuyKe"])
             gia_tri_con_lai = nguyen_gia - luy_ke
 
-            # Chỉ tính khi còn giá trị khấu hao
             if gia_tri_con_lai <= gia_tri_thu_hoi:
                 continue
 
-            if phuong_phap == 'declining-balance':
-                ty_le_thang = (2 / so_nam) / 12
-                khau_hao_thang = gia_tri_con_lai * ty_le_thang
-            else:
-                # Đường thẳng (straight-line)
-                khau_hao_thang = (nguyen_gia - gia_tri_thu_hoi) / (so_nam * 12)
+            so_thang = so_nam * 12
 
-            # Không khấu hao vượt phần còn được khấu hao
+            # =========================
+            # 4. DEPRECIATION METHOD
+            # =========================
+
+            if phuong_phap == "declining-balance":
+
+                rate_year = 2 / so_nam
+                rate_month = 1 - (1 - rate_year) ** (1 / 12)
+
+                khau_hao_thang = gia_tri_con_lai * rate_month
+
+                straight_line = (nguyen_gia - gia_tri_thu_hoi) / so_thang
+
+                if khau_hao_thang < straight_line:
+                    khau_hao_thang = straight_line
+
+            else:
+                khau_hao_thang = (nguyen_gia - gia_tri_thu_hoi) / so_thang
+
+            # =========================
+            # 5. FINAL SAFETY LIMIT
+            # =========================
+
             thuc_ghi = min(khau_hao_thang, gia_tri_con_lai - gia_tri_thu_hoi)
 
-            new_luy_ke   = luy_ke + thuc_ghi
-            new_con_lai  = nguyen_gia - new_luy_ke
+            new_luy_ke = luy_ke + thuc_ghi
+            new_con_lai = nguyen_gia - new_luy_ke
+
+            # =========================
+            # 6. INSERT
+            # =========================
 
             cursor.execute("""
-                INSERT INTO LICHSUKHAUHAO (ID_TB, Nam, Thang, GiaTriKhauHaoThang, GiaTriLuyKe, GiaTriConLai)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (id_tb, nam, thang, thuc_ghi, new_luy_ke, new_con_lai))
+                INSERT INTO LICHSUKHAUHAO
+                (ID_TB, Nam, Thang, GiaTriKhauHaoThang, GiaTriLuyKe, GiaTriConLai)
+                VALUES (%s,%s,%s,%s,%s,%s)
+            """, (
+                id_tb, nam, thang,
+                thuc_ghi, new_luy_ke, new_con_lai
+            ))
+
             inserted += 1
 
         conn.commit()
@@ -118,11 +215,11 @@ def caculate_depre(thang=None, nam=None):
     except Exception as e:
         conn.rollback()
         raise e
+
     finally:
         cursor.close()
         conn.close()
-
-
+        
 def get_depreciation_detail(ma_tb):
     conn = None
     cursor = None
@@ -134,3 +231,4 @@ def get_depreciation_detail(ma_tb):
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
+

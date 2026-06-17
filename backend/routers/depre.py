@@ -23,7 +23,6 @@ def set_depreciation():
         return jsonify({"message": "Lỗi hệ thống: " + str(e)}), 500
 
 
-# ─── Chạy khấu hao tháng ──────────────────────────────────────────────────────
 @depre_bp.route("/run-monthly", methods=["POST"])
 @token_and_role_required(allowed_roles=["ADMIN"])
 def run_monthly_depreciation():
@@ -40,8 +39,22 @@ def run_monthly_depreciation():
     except Exception as e:
         return jsonify({"message": str(e)}), 500
 
+@depre_bp.route("/generate-history", methods=["POST"])
+@token_and_role_required(allowed_roles=["ADMIN"])
+def generate_history():
 
-# ─── Lấy chi tiết cấu hình khấu hao 1 thiết bị ───────────────────────────────
+    for nam in [2025, 2026]:
+        start = 6 if nam == 2025 else 1
+        end = 12 if nam == 2025 else 6
+
+        for thang in range(start, end + 1):
+            try:
+                caculate_depre(thang, nam)
+            except Exception as e:
+                print(f"Lỗi {thang}/{nam}: {e}")
+
+    return jsonify({"message": "Đã sinh dữ liệu 06/2025 -> 06/2026"}), 200
+
 @depre_bp.route("/detail/<ma_tb>", methods=["GET"])
 @token_and_role_required(allowed_roles=["ADMIN", "HR", "USER"])
 def get_depreciation_config(ma_tb):
@@ -51,7 +64,6 @@ def get_depreciation_config(ma_tb):
     return jsonify(config), 200
 
 
-# ─── Báo cáo tổng hợp THEO THÁNG (tab 1) ─────────────────────────────────────
 @depre_bp.route("/report-by-month", methods=["GET"])
 @token_and_role_required(allowed_roles=["ADMIN"])
 def get_report_by_month():
@@ -115,7 +127,6 @@ def get_report_by_month():
         conn.close()
 
 
-# ─── Biểu đồ tổng khấu hao 12 tháng (tab 1 - chart) ─────────────────────────
 @depre_bp.route("/chart-data", methods=["GET"])
 @token_and_role_required(allowed_roles=["ADMIN"])
 def get_chart_data():
@@ -127,7 +138,6 @@ def get_chart_data():
             FROM LICHSUKHAUHAO
             GROUP BY Nam, Thang
             ORDER BY Nam ASC, Thang ASC
-            LIMIT 12
         """
         cursor.execute(sql)
         data = cursor.fetchall()
@@ -137,7 +147,6 @@ def get_chart_data():
         conn.close()
 
 
-# ─── Danh sách thiết bị để hiện ở dropdown tab 2 ─────────────────────────────
 @depre_bp.route("/devices", methods=["GET"])
 @token_and_role_required(allowed_roles=["ADMIN", "HR", "USER"])
 def get_depre_devices():
@@ -173,6 +182,60 @@ def get_depreciation_history(ma_tb):
         return jsonify(history), 200
     except Exception as e:
         return jsonify({"message": f"Lỗi: {str(e)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+        
+@depre_bp.route("/generate-config", methods=["POST"])
+@token_and_role_required(allowed_roles=["ADMIN"])
+def generate_config():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            INSERT INTO KHAUHAO (
+                ID_TB,
+                PhuongPhapTinh,
+                ThoiGianSuDung,
+                GiaTriThuHoi,
+                GiaTriBanDau,
+                NgayBatDau,
+                NgayKetThuc
+            )
+            SELECT
+                t.ID_TB,
+                'straight-line',
+                COALESCE(d.ThoiGianKhauHao, 5),
+                0,
+                t.NguyenGia,
+                t.NgayMua,
+                DATE_ADD(
+                    t.NgayMua,
+                    INTERVAL COALESCE(d.ThoiGianKhauHao, 5) YEAR
+                )
+            FROM THIETBI t
+            LEFT JOIN DANHMUCSANPHAM d
+                ON t.ID_DM = d.ID_DM
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM KHAUHAO k
+                WHERE k.ID_TB = t.ID_TB
+            )
+        """)
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Sinh cấu hình khấu hao thành công"
+        }), 200
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({
+            "message": str(e)
+        }), 500
+
     finally:
         cursor.close()
         conn.close()

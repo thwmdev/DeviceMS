@@ -17,9 +17,7 @@ function getHeaders() {
   return { Authorization: `Bearer ${localStorage.getItem("token")}` };
 }
 
-// ─────────────────────────────────────────────────────────────
-// TAB 1: Báo cáo theo tháng
-// ─────────────────────────────────────────────────────────────
+
 function MonthlyTab() {
   const now = new Date();
   const [filter, setFilter] = useState({ thang: now.getMonth() + 1, nam: now.getFullYear() });
@@ -76,7 +74,7 @@ function MonthlyTab() {
   const updateLife = async (maTB, curVal, newVal) => {
     if (Number(newVal) === Number(curVal) || !newVal || newVal <= 0) return;
 
-    // Hỏi người dùng có muốn tính lại từ đầu không
+    
     const resetHistory = window.confirm(
       `Bạn có muốn XÓA lịch sử khấu hao cũ của thiết bị #${maTB} và tính lại từ đầu?\n` +
       `• Chọn OK  → Xóa lịch sử cũ, tính lại từ tháng đầu tiên.\n` +
@@ -163,7 +161,7 @@ function MonthlyTab() {
         </select>
 
         <button className="btn-primary" onClick={handleRun} disabled={running}>
-          {running ? <>Đang chạy… <span className="spinner" /></> : `▶ Chạy khấu hao T${filter.thang}/${filter.nam}`}
+          {running ? <>Đang chạy… <span className="spinner" /></> : `Chạy khấu hao T${filter.thang}/${filter.nam}`}
         </button>
       </div>
 
@@ -189,7 +187,7 @@ function MonthlyTab() {
 
       {/* Chart */}
       <div className="chart-card">
-        <h3>📊 Tổng khấu hao theo tháng (12 tháng gần nhất)</h3>
+        <h3>Tổng khấu hao theo tháng (12 tháng gần nhất)</h3>
         <TotalDepreChart data={chartData} />
       </div>
 
@@ -267,9 +265,7 @@ function MonthlyTab() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// TAB 2: Lịch sử theo thiết bị
-// ─────────────────────────────────────────────────────────────
+
 function DeviceTab() {
   const [devices, setDevices]   = useState([]);
   const [selected, setSelected] = useState("");
@@ -299,7 +295,8 @@ function DeviceTab() {
 
   const selectedInfo = devices.find((d) => String(d.MaTB) === String(selected)) || null;
 
-  // Xử lý danh sách hiển thị trong ô chọn
+
+
   const filteredDevices = useMemo(() => {
     let res = devices;
     if (searchDev) {
@@ -310,7 +307,6 @@ function DeviceTab() {
       );
     }
     if (statusDev) {
-      // mapping nhẹ vì status DB có thể là DA_CAP_PHAT hoặc DangSuDung
       res = res.filter((d) => {
         if (statusDev === "DangSuDung") return d.TrangThai === "DangSuDung" || d.TrangThai === "DA_CAP_PHAT";
         if (statusDev === "SanSang") return d.TrangThai === "SanSang" || d.TrangThai === "SAN_SANG";
@@ -320,12 +316,12 @@ function DeviceTab() {
     return res;
   }, [devices, searchDev, statusDev]);
 
-  // Tổng lũy kế gần nhất (bản ghi mới nhất)
+  // Tổng lũy kế gần
   const latestRow = history.length > 0 ? history[history.length - 1] : null;
 
   return (
     <>
-      {/* Chọn thiết bị có search/filter */}
+
       <div className="filter-bar" style={{ flexDirection: "column", alignItems: "flex-start", gap: "16px" }}>
         <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", width: "100%", alignItems: "center" }}>
           <label>Tìm kiếm thiết bị:</label>
@@ -369,12 +365,12 @@ function DeviceTab() {
 
       {!selected ? (
         <div className="empty-state">
-          <div className="empty-state-icon">💻</div>
+          <div className="empty-state-icon"></div>
           <div>Hãy chọn một thiết bị để xem lịch sử khấu hao</div>
         </div>
       ) : (
         <>
-          {/* Thông tin thiết bị */}
+          
           {selectedInfo && (
             <div className="device-info-bar">
               <div className="device-info-item">
@@ -402,7 +398,7 @@ function DeviceTab() {
 
           {/* Biểu đồ */}
           <div className="chart-card" style={{ marginTop: "16px" }}>
-            <h3>📈 Biểu đồ hao mòn — {selectedInfo?.TenThietBi}</h3>
+            <h3>Biểu đồ hao mòn — {selectedInfo?.TenThietBi}</h3>
             {loading ? (
               <div style={{ height: 280, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span className="spinner" style={{ width: 32, height: 32 }} />
@@ -470,13 +466,13 @@ export default function Depreciation() {
               className={`tab-btn ${tab === "monthly" ? "active" : ""}`}
               onClick={() => setTab("monthly")}
             >
-              📊 Theo Tháng
+              Theo Tháng
             </button>
             <button
               className={`tab-btn ${tab === "device" ? "active" : ""}`}
               onClick={() => setTab("device")}
             >
-              💻 Theo Thiết bị
+              Theo Thiết bị
             </button>
           </div>
         </div>

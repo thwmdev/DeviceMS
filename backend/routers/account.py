@@ -67,3 +67,4 @@ def reset_password(matk):
         return jsonify({"message": "Đã reset về mật khẩu mặc định 123456!"}), 200
     except Exception as e:
         return jsonify({"message": "Lỗi hệ thống!"}), 500
+
