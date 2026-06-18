@@ -249,23 +249,6 @@ export default function Devices() {
     }
   };
 
-  const handleDisposeDevice = async (device) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn thanh lý thiết bị "${device.TenThietBi}"?`)) {
-      return;
-    }
-    try {
-      setLoading(true);
-      await axios.delete(`${API_URL}/delete/${device.MaTB}`, { headers: authHeader() });
-      alert("Thanh lý thiết bị thành công.");
-      await Promise.all([loadDevices(), loadMetrics()]);
-    } catch (err) {
-      handleAuthError(err);
-      alert(err?.response?.data?.message || "Thanh lý thiết bị thất bại.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
 
 
   return (
@@ -485,11 +468,6 @@ export default function Devices() {
                         <button className="btn-edit" onClick={() => handleOpenEditModal(device)} disabled={loading}>
                           Sửa
                         </button>
-                        {device.TrangThai === "SAN_SANG" && (
-                          <button className="btn-delete" onClick={() => handleDisposeDevice(device)} disabled={loading}>
-                            Thanh lý
-                          </button>
-                        )}
                       </div>
                     </td>
                   )}
