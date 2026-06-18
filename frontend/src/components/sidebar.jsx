@@ -74,7 +74,7 @@ export default function Sidebar() {
         </div>
       )}
 
-      <ul className="sidebar-menu">
+      <div className="sidebar-menu">
         {user && PERMISSIONS.viewDashboard(user.role) && (
           <li
             className={`menu-item ${currentPath === "/dashboard" || currentPath === "/" ? "active" : ""}`}
@@ -136,7 +136,7 @@ export default function Sidebar() {
             <span>Quản lý khấu hao</span>
           </li>
         )}
-      </ul>
+      </div>
 
       <div className="sidebar-footer">
         <button className="logout-button" onClick={handleLogout}>

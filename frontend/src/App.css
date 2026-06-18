@@ -252,10 +252,10 @@
 }
 
 .sidebar-menu {
-  display: grid;
-  gap: 6px;
   flex: 1;
-  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .menu-item {
@@ -263,7 +263,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 46px;
+  height: 60px;
   padding: 0 13px;
   color: rgba(233, 238, 233, .68);
   border-radius: 15px;
@@ -301,6 +301,7 @@
 }
 
 .sidebar-footer {
+  margin-top: auto;
   padding-top: 16px;
 }
 
@@ -871,10 +872,10 @@
 .btn-edit,
 .btn-delete {
   min-height: 34px;
-  margin-right: 6px;
   padding: 7px 12px;
   border-radius: 999px;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .btn-edit {
@@ -1023,7 +1024,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .status-badge {
