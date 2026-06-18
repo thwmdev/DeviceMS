@@ -355,7 +355,6 @@ def update_device(matb, data):
                 SeriNumber = %s,
                 NgayMua = %s,
                 NguyenGia = %s,
-                TrangThai = %s
             WHERE ID_TB = %s
             """,
             (
@@ -364,7 +363,6 @@ def update_device(matb, data):
                 seri,
                 data.get("NgayMua") or None,
                 data.get("GiaTri") or None,
-                normalize_status_for_db(data["TrangThai"]),
                 matb,
             ),
         )
