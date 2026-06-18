@@ -133,7 +133,7 @@ export default function Sidebar() {
             onClick={() => navigate('/depreciation')}
           >
             <i className="ti ti-calculator" />
-            <span>Thiết lập khấu hao</span>
+            <span>Quản lý khấu hao</span>
           </li>
         )}
       </div>
