@@ -1,6 +1,8 @@
 from database.db import get_connection
 import datetime
+import calendar
 from datetime import date
+from dateutil.relativedelta import relativedelta
 
 
 
@@ -14,7 +16,7 @@ def save_depreciation(data):
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT NguyenGia, NgayMua
+            SELECT NguyenGia
             FROM THIETBI
             WHERE ID_TB = %s
         """, (data["MaTB"],))
@@ -25,15 +27,23 @@ def save_depreciation(data):
             raise ValueError("Không tìm thấy thiết bị.")
 
         nguyen_gia = float(device["NguyenGia"])
-        ngay_mua = device["NgayMua"]
 
-        if not ngay_mua:
-            raise ValueError("Thiết bị chưa có ngày mua.")
+        # Lấy ngày cấp phát đầu tiên thay vì ngày mua
+        cursor.execute("""
+            SELECT MIN(NgayCap) AS NgayCapDauTien
+            FROM LICHSUCAPPHAT
+            WHERE ID_TB = %s
+        """, (data["MaTB"],))
+        cap_phat = cursor.fetchone()
+        ngay_cap_dau = cap_phat["NgayCapDauTien"] if cap_phat else None
+
+        if not ngay_cap_dau:
+            raise ValueError("Thiết bị chưa được cấp phát, không thể tính khấu hao.")
 
         if float(data["residualValue"]) >= nguyen_gia:
             raise ValueError("Giá trị thu hồi phải nhỏ hơn nguyên giá.")
 
-        ngay_bat_dau = ngay_mua
+        ngay_bat_dau = ngay_cap_dau.date() if hasattr(ngay_cap_dau, 'date') else ngay_cap_dau
 
         # FIX chuẩn ERP (không cộng tay year nữa)
         ngay_ket_thuc = ngay_bat_dau + relativedelta(years=int(data["usefulLife"]))
@@ -100,7 +110,8 @@ def caculate_depre(thang=None, nam=None):
                 COALESCE(k.ThoiGianSuDung, 5) AS SoNam,
                 COALESCE(k.GiaTriThuHoi, 0) AS GiaTriThuHoi,
                 k.NgayBatDau,
-                k.NgayKetThuc
+                k.NgayKetThuc,
+                (SELECT MIN(NgayCap) FROM LICHSUCAPPHAT WHERE ID_TB = t.ID_TB) AS NgayCapDauTien
             FROM THIETBI t
             LEFT JOIN KHAUHAO k ON t.ID_TB = k.ID_TB
             WHERE t.TrangThai IN ('DangSuDung', 'DA_CAP_PHAT', 'DaCapPhat', 'DANG_SU_DUNG')
@@ -117,23 +128,31 @@ def caculate_depre(thang=None, nam=None):
             gia_tri_thu_hoi = float(item["GiaTriThuHoi"] or 0)
             phuong_phap = item["PhuongPhapTinh"]
 
-            ngay_bat_dau = item["NgayBatDau"]
             ngay_ket_thuc = item["NgayKetThuc"]
+
+            # Chưa cấp phát → không tính khấu hao
+            ngay_cap_dau = item.get("NgayCapDauTien")
+            if not ngay_cap_dau:
+                continue
+
+            if hasattr(ngay_cap_dau, 'date'):
+                ngay_cap_dau = ngay_cap_dau.date()
+
+            ngay_bat_dau = ngay_cap_dau
 
             # =========================
             # 1. VALID TIME RANGE
             # =========================
 
-            if ngay_bat_dau and ngay_bat_dau > end_month:
+            if ngay_bat_dau > end_month:
                 continue
 
             if ngay_ket_thuc and ngay_ket_thuc < start_month:
                 continue
 
-            # 👉 không cho chạy trước ngày mua
-            if ngay_bat_dau:
-                if (nam < ngay_bat_dau.year) or (nam == ngay_bat_dau.year and thang < ngay_bat_dau.month):
-                    continue
+            # 👉 không cho chạy trước ngày cấp phát đầu tiên
+            if (nam < ngay_bat_dau.year) or (nam == ngay_bat_dau.year and thang < ngay_bat_dau.month):
+                continue
 
             # =========================
             # 2. AVOID DUPLICATE MONTH

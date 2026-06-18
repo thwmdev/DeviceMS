@@ -56,6 +56,72 @@ def generate_history():
 
     return jsonify({"message": "Đã sinh dữ liệu 06/2025 -> 06/2026"}), 200
 
+
+@depre_bp.route("/cleanup-and-recalc", methods=["POST"])
+@token_and_role_required(allowed_roles=["ADMIN"])
+def cleanup_and_recalc():
+    """
+    1. Xóa toàn bộ LICHSUKHAUHAO
+    2. Tính lại khấu hao từ tháng cấp phát đầu tiên → tháng hiện tại
+       Chỉ thiết bị đã cấp phát mới được tính.
+    """
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        # 1. Xóa toàn bộ lịch sử cũ
+        cursor.execute("DELETE FROM LICHSUKHAUHAO")
+        deleted = cursor.rowcount
+        conn.commit()
+
+        # 2. Tìm tháng cấp phát sớm nhất trong hệ thống
+        cursor.execute("""
+            SELECT MIN(NgayCap) AS EarliestAlloc
+            FROM LICHSUCAPPHAT
+        """)
+        row = cursor.fetchone()
+        earliest = row["EarliestAlloc"] if row else None
+
+        if not earliest:
+            return jsonify({
+                "message": f"Đã xóa {deleted} bản ghi cũ. Không có thiết bị nào được cấp phát, không cần tính lại."
+            }), 200
+
+        # Chuyển về date nếu cần
+        if hasattr(earliest, 'date'):
+            earliest = earliest.date()
+
+        now = datetime.datetime.now()
+        inserted_total = 0
+
+        # 3. Chạy từ tháng cấp phát sớm nhất → tháng hiện tại
+        y, m = earliest.year, earliest.month
+        while (y < now.year) or (y == now.year and m <= now.month):
+            try:
+                result = caculate_depre(m, y)
+                inserted_total += result.get("inserted", 0)
+            except Exception as e:
+                print(f"Lỗi tính lại {m}/{y}: {e}")
+
+            m += 1
+            if m > 12:
+                m = 1
+                y += 1
+
+        return jsonify({
+            "message": f"Đã xóa {deleted} bản ghi cũ. Tính lại từ {earliest.month}/{earliest.year} → {now.month}/{now.year}: {inserted_total} bản ghi mới.",
+            "deleted": deleted,
+            "inserted": inserted_total
+        }), 200
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"message": f"Lỗi: {str(e)}"}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
+
 @depre_bp.route("/detail/<ma_tb>", methods=["GET"])
 @token_and_role_required(allowed_roles=["ADMIN", "HR", "USER"])
 def get_depreciation_config(ma_tb):
@@ -84,6 +150,8 @@ def get_report_by_month():
             t.NgayMua,
             t.TrangThai,
             COALESCE(k.ThoiGianSuDung, d.ThoiGianKhauHao, 5)   AS ThoiGianSuDung,
+
+            (SELECT MIN(NgayCap) FROM LICHSUCAPPHAT WHERE ID_TB = t.ID_TB) AS NgayCapDauTien,
 
             COALESCE(l.GiaTriKhauHaoThang, 0)                   AS GiaTriKhauHaoThang,
 
@@ -220,14 +288,19 @@ def generate_config():
                 COALESCE(d.ThoiGianKhauHao, 5),
                 0,
                 t.NguyenGia,
-                t.NgayMua,
+                DATE(cp.NgayCapDauTien),
                 DATE_ADD(
-                    t.NgayMua,
+                    DATE(cp.NgayCapDauTien),
                     INTERVAL COALESCE(d.ThoiGianKhauHao, 5) YEAR
                 )
             FROM THIETBI t
             LEFT JOIN DANHMUCSANPHAM d
                 ON t.ID_DM = d.ID_DM
+            INNER JOIN (
+                SELECT ID_TB, MIN(NgayCap) AS NgayCapDauTien
+                FROM LICHSUCAPPHAT
+                GROUP BY ID_TB
+            ) cp ON t.ID_TB = cp.ID_TB
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM KHAUHAO k
@@ -246,6 +319,116 @@ def generate_config():
         return jsonify({
             "message": str(e)
         }), 500
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ─── Kiểm tra khấu hao: so sánh ngày mua vs ngày cấp phát ────────────────
+@depre_bp.route("/verify", methods=["GET"])
+@token_and_role_required(allowed_roles=["ADMIN"])
+def verify_depreciation():
+    """
+    Trả về danh sách thiết bị kèm:
+    - Ngày mua (NgayMua) vs Ngày cấp phát đầu tiên (NgayCapDauTien)
+    - Cấu hình khấu hao hiện tại (NgayBatDau trong KHAUHAO)
+    - Khấu hao kỳ vọng hàng tháng (straight-line)
+    - Tổng số tháng đã tính, tổng lũy kế, giá trị còn lại
+    - Trạng thái OK / CHƯA_CẤP_PHÁT / CHƯA_CÓ_LỊCH_SỬ
+    """
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT
+                t.ID_TB                                           AS MaTB,
+                t.TenThietBi,
+                t.NguyenGia,
+                t.NgayMua,
+                t.TrangThai,
+
+                (SELECT MIN(NgayCap)
+                 FROM LICHSUCAPPHAT
+                 WHERE ID_TB = t.ID_TB)                           AS NgayCapDauTien,
+
+                k.NgayBatDau                                      AS KH_NgayBatDau,
+                k.NgayKetThuc                                     AS KH_NgayKetThuc,
+                COALESCE(k.ThoiGianSuDung, d.ThoiGianKhauHao, 5) AS ThoiGianSuDung,
+                COALESCE(k.GiaTriThuHoi, 0)                       AS GiaTriThuHoi,
+                COALESCE(k.PhuongPhapTinh, 'straight-line')       AS PhuongPhap,
+
+                (SELECT COUNT(*)
+                 FROM LICHSUKHAUHAO
+                 WHERE ID_TB = t.ID_TB)                           AS SoThangDaTinh,
+
+                COALESCE((
+                    SELECT SUM(GiaTriKhauHaoThang)
+                    FROM LICHSUKHAUHAO
+                    WHERE ID_TB = t.ID_TB
+                ), 0)                                             AS TongLuyKe,
+
+                t.NguyenGia - COALESCE((
+                    SELECT SUM(GiaTriKhauHaoThang)
+                    FROM LICHSUKHAUHAO
+                    WHERE ID_TB = t.ID_TB
+                ), 0)                                             AS GiaTriConLai,
+
+                (SELECT MIN(CONCAT(Nam, '-', LPAD(Thang, 2, '0')))
+                 FROM LICHSUKHAUHAO
+                 WHERE ID_TB = t.ID_TB)                           AS ThangDauTienTinh,
+
+                (SELECT MAX(CONCAT(Nam, '-', LPAD(Thang, 2, '0')))
+                 FROM LICHSUKHAUHAO
+                 WHERE ID_TB = t.ID_TB)                           AS ThangCuoiTinh
+
+            FROM THIETBI t
+            LEFT JOIN KHAUHAO k ON t.ID_TB = k.ID_TB
+            LEFT JOIN DANHMUCSANPHAM d ON t.ID_DM = d.ID_DM
+            WHERE t.TrangThai NOT IN ('ThanhLy', 'THANH_LY')
+            ORDER BY t.ID_TB
+        """)
+        rows = cursor.fetchall()
+
+        result = []
+        for r in rows:
+            nguyen_gia = float(r["NguyenGia"] or 0)
+            thoi_gian  = int(r["ThoiGianSuDung"] or 5)
+            thu_hoi    = float(r["GiaTriThuHoi"] or 0)
+            so_thang   = thoi_gian * 12
+
+            kh_thang_ky_vong = round((nguyen_gia - thu_hoi) / so_thang, 2) if so_thang > 0 else 0
+
+            ngay_cap = r["NgayCapDauTien"]
+            so_thang_da_tinh = int(r["SoThangDaTinh"] or 0)
+
+            if not ngay_cap:
+                trang_thai = "CHUA_CAP_PHAT"
+            elif so_thang_da_tinh == 0:
+                trang_thai = "CHUA_CO_LICH_SU"
+            else:
+                trang_thai = "OK"
+
+            result.append({
+                "MaTB": r["MaTB"],
+                "TenThietBi": r["TenThietBi"],
+                "NguyenGia": nguyen_gia,
+                "NgayMua": str(r["NgayMua"]) if r["NgayMua"] else None,
+                "NgayCapDauTien": str(ngay_cap) if ngay_cap else None,
+                "KH_NgayBatDau": str(r["KH_NgayBatDau"]) if r["KH_NgayBatDau"] else None,
+                "ThoiGianSuDung_Nam": thoi_gian,
+                "PhuongPhap": r["PhuongPhap"],
+                "KhauHaoThangKyVong": kh_thang_ky_vong,
+                "SoThangDaTinh": so_thang_da_tinh,
+                "TongLuyKe": float(r["TongLuyKe"]),
+                "GiaTriConLai": float(r["GiaTriConLai"]),
+                "ThangDauTienTinh": r["ThangDauTienTinh"],
+                "ThangCuoiTinh": r["ThangCuoiTinh"],
+                "TrangThaiKiemTra": trang_thai,
+                "TrangThaiTB": r["TrangThai"],
+            })
+
+        return jsonify(result), 200
 
     finally:
         cursor.close()
