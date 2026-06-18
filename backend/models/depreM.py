@@ -132,13 +132,15 @@ def caculate_depre(thang=None, nam=None):
 
             # Chưa cấp phát → không tính khấu hao
             ngay_cap_dau = item.get("NgayCapDauTien")
-            if not ngay_cap_dau:
+            ngay_bat_dau_db = item.get("NgayBatDau")
+
+            if not ngay_bat_dau_db and not ngay_cap_dau:
                 continue
 
-            if hasattr(ngay_cap_dau, 'date'):
-                ngay_cap_dau = ngay_cap_dau.date()
-
-            ngay_bat_dau = ngay_cap_dau
+            if ngay_bat_dau_db:
+                ngay_bat_dau = ngay_bat_dau_db.date() if hasattr(ngay_bat_dau_db, 'date') else ngay_bat_dau_db
+            else:
+                ngay_bat_dau = ngay_cap_dau.date() if hasattr(ngay_cap_dau, 'date') else ngay_cap_dau
 
             # =========================
             # 1. VALID TIME RANGE
