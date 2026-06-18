@@ -10,7 +10,7 @@ import { getNextSort, sortRows } from "../utils/tableSort";
 import "../styles/depre.css";
 import { toast } from "react-toastify";
 
-const API = "http://127.0.0.1:5000/api/depreciation";
+const API = "https://devicems-hd3z.onrender.com/api/depreciation";
 const fmtVND = (v) => Number(v || 0).toLocaleString("vi-VN") + " đ";
 
 function getHeaders() {
@@ -94,7 +94,7 @@ function MonthlyTab() {
     setSavingId(maTB);
     try {
       const res = await axios.put(
-        `http://127.0.0.1:5000/api/device/update-life/${maTB}`,
+        `https://devicems-hd3z.onrender.com/api/device/update-life/${maTB}`,
         { ThoiGianSuDung: Number(newVal), reset_history: resetHistory },
         { headers: getHeaders() }
       );

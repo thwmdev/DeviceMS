@@ -8,8 +8,8 @@ import SortableHeader from "../components/SortableHeader";
 import Pagination from "../components/Pagination";
 import { getNextSort, sortRows } from "../utils/tableSort";
 
-const API_URL = "http://127.0.0.1:5000/api/device";
-const CATEGORY_API_URL = "http://127.0.0.1:5000/api/product-category";
+const API_URL = "https://devicems-hd3z.onrender.com/api/device";
+const CATEGORY_API_URL = "https://devicems-hd3z.onrender.com/api/product-category";
 
 const EMPTY_EDIT_FORM = {
   MaThietBi: "",
@@ -120,7 +120,7 @@ export default function Devices() {
   const loadMetrics = useCallback(async () => {
     if (isUser) return;
     try {
-      const res = await axios.get("http://127.0.0.1:5000/api/inventory/stats", {
+      const res = await axios.get("https://devicems-hd3z.onrender.com/api/inventory/stats", {
         headers: authHeader(),
       });
       const data = res.data.stats?.categories || [];

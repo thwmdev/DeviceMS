@@ -7,7 +7,7 @@ import SortableHeader from "../components/SortableHeader";
 import Pagination from "../components/Pagination";
 import { getNextSort, sortRows } from "../utils/tableSort";
 
-const API_URL = "http://127.0.0.1:5000/api/product-category";
+const API_URL = "https://devicems-hd3z.onrender.com/api/product-category";
 
 const EMPTY_ROW = {
   MaDanhMuc: "",
