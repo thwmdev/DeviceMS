@@ -7,8 +7,22 @@ def _clean_account_role(role):
     normalized = normalize_role_value(role)
     if normalized not in VALID_ROLES:
         raise ValueError("VaiTro chi duoc la ADMIN, HR hoac NHANVIEN")
-
     return normalized
+
+
+def get_account_hashed_password(matk):
+    conn = get_connection()
+    if not conn:
+        return None
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT MatKhau FROM TAIKHOAN WHERE ID_TK = %s", (matk,))
+        row = cursor.fetchone()
+        return row[0] if row else None
+    finally:
+        cursor.close()
+        conn.close()
+
 
 def get_all_accounts():
     """Lấy danh sách tất cả tài khoản."""

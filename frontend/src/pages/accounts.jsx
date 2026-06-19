@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Sidebar from "../components/sidebar";
 import AccountModal from "../components/accM";
+import ChangePasswordModal from "../components/ChangePasswordModal";
 import Pagination from "../components/Pagination";
 import "../styles/acc.css";
 import { getRoleLabel } from "../utils/roles";
@@ -13,6 +14,7 @@ const Accounts = () => {
   const [accounts, setAccounts] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
+  const [chpwTarget, setChpwTarget] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -22,14 +24,11 @@ const Accounts = () => {
       const res = await axios.get("https://devicems-hd3z.onrender.com/api/account/list", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
-        console.log("API RESPONSE:", res.data);
       setAccounts(res.data);
     } catch (err) {
       toast.error("Lỗi: " + (err.response?.data?.message || "Không thể tải danh sách tài khoản"));
     }
   };
-
-
 
   const handleToggle = async (id) => {
     try {
@@ -42,15 +41,10 @@ const Accounts = () => {
     }
   };
 
-
-
-
   const handleEdit = (account) => {
-      console.log("EDIT ACCOUNT =", account);
-      setEditingAccount(account);
-      setIsModalOpen(true);
+    setEditingAccount(account);
+    setIsModalOpen(true);
   };
-
 
   const handleAdd = () => {
     setEditingAccount(null);
@@ -58,30 +52,27 @@ const Accounts = () => {
   };
 
   const handleResetPassword = async (acc) => {
-  const accepted = await confirm({
-    tone: "danger",
-    eyebrow: "Tài khoản",
-    title: "Reset mật khẩu",
-    message: `Reset mật khẩu của ${acc.TenDangNhap} về mật khẩu mặc định 123456?`,
-    details: "Người dùng nên đổi mật khẩu sau khi đăng nhập lại.",
-    confirmText: "Reset mật khẩu",
-    cancelText: "Hủy",
-  });
-  if (!accepted) {
-    return;
-  }
+    const accepted = await confirm({
+      tone: "danger",
+      eyebrow: "Tài khoản",
+      title: "Reset mật khẩu",
+      message: `Reset mật khẩu của ${acc.TenDangNhap} về mật khẩu mặc định 123456?`,
+      details: "Người dùng nên đổi mật khẩu sau khi đăng nhập lại.",
+      confirmText: "Reset mật khẩu",
+      cancelText: "Hủy",
+    });
+    if (!accepted) return;
 
-  try {
-    
-    await axios.put(`https://devicems-hd3z.onrender.com/api/account/reset-password/${acc.ID_TK}`, 
-      {}, 
-      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-    );
-    toast.success("Reset mật khẩu thành công!");
-  } catch (err) {
-    toast.error("Lỗi: " + (err.response?.data?.message || "Không thể reset mật khẩu"));
-  }
-};
+    try {
+      await axios.put(`https://devicems-hd3z.onrender.com/api/account/reset-password/${acc.ID_TK}`,
+        {},
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
+      toast.success("Reset mật khẩu thành công!");
+    } catch (err) {
+      toast.error("Lỗi: " + (err.response?.data?.message || "Không thể reset mật khẩu"));
+    }
+  };
 
   useEffect(() => {
     fetchAccounts();
@@ -105,13 +96,20 @@ const Accounts = () => {
         </div>
 
         {isModalOpen && (
-          <AccountModal 
+          <AccountModal
             onClose={() => {
               setIsModalOpen(false);
               setEditingAccount(null);
-            }} 
-            refresh={fetchAccounts} 
-            accountData={editingAccount} 
+            }}
+            refresh={fetchAccounts}
+            accountData={editingAccount}
+          />
+        )}
+
+        {chpwTarget && (
+          <ChangePasswordModal
+            targetAccount={chpwTarget}
+            onClose={() => setChpwTarget(null)}
           />
         )}
 
@@ -135,12 +133,15 @@ const Accounts = () => {
                   </span>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button className="btn-edit" onClick={() => handleEdit(acc)}>
                       Cập nhật
                     </button>
+                    <button className="btn-action" onClick={() => setChpwTarget(acc)}>
+                      Đổi mật khẩu
+                    </button>
                     <button className="btn-action" onClick={() => handleResetPassword(acc)}>
-                      Reset Mật khẩu
+                      Reset MK
                     </button>
                     <button className="btn-action" onClick={() => handleToggle(acc.ID_TK)}>
                       {acc.TrangThai === 'HoatDong' ? 'Khóa' : 'Mở khóa'}
@@ -152,10 +153,10 @@ const Accounts = () => {
           </tbody>
         </table>
 
-        <Pagination 
-          currentPage={currentPage} 
-          totalPages={totalPages} 
-          onPageChange={setCurrentPage} 
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
         />
       </main>
     </div>

@@ -4,30 +4,21 @@ import { getCanonicalStoredRole } from "../utils/roles";
 import { toast } from "react-toastify";
 
 const AccountModal = ({ onClose, refresh, accountData }) => {
-  const isEdit = !!accountData; 
-  const initialRole = getCanonicalStoredRole(accountData?.VaiTro || "NHANVIEN");
-  const [formData, setFormData] = useState({ 
-      HoTen: accountData?.HoTen || "", 
-      PhongBan: accountData?.PhongBan || "IT", 
-      ChucVu: accountData?.ChucVu || "NHANVIEN", 
-      TenDangNhap: accountData?.TenDangNhap || "", 
-      MatKhau: "",
-      VaiTro: initialRole 
-    });
-
   const isEdit = !!accountData;
+  const initialRole = getCanonicalStoredRole(
+    accountData?.VaiTro || "NHANVIEN"
+  );
 
   const [formData, setFormData] = useState({
-    HoTen: "",
-    PhongBan: "",
-    ChucVu: "NHANVIEN",
-    TenDangNhap: "",
-    Email: "",
+    HoTen: accountData?.HoTen || "",
+    PhongBan: accountData?.PhongBan || "IT",
+    ChucVu: accountData?.ChucVu || "NHANVIEN",
+    TenDangNhap: accountData?.TenDangNhap || "",
+    Email: accountData?.Email || "",
     MatKhau: "",
-    VaiTro: "NHANVIEN",
+    VaiTro: initialRole,
   });
 
- 
   useEffect(() => {
     if (accountData) {
       setFormData({
@@ -37,12 +28,12 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
         TenDangNhap: accountData.TenDangNhap || "",
         Email: accountData.Email || "",
         MatKhau: "",
-        VaiTro: accountData.VaiTro || "NHANVIEN",
+        VaiTro: getCanonicalStoredRole(
+          accountData.VaiTro || "NHANVIEN"
+        ),
       });
     }
   }, [accountData]);
-
-
 
   const handleRoleChange = (role) => {
     let phongBan = "";
@@ -70,14 +61,8 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    
-    
     if (!formData.HoTen || !formData.TenDangNhap) {
       toast.warning("Vui lòng điền đủ thông tin!");
-
-
-    if (!formData.HoTen || !formData.TenDangNhap) {
-      alert("Thiếu thông tin!");
       return;
     }
 
@@ -89,26 +74,12 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
       };
 
       if (isEdit) {
-        
         const updateData = {
           HoTen: formData.HoTen,
           VaiTro: formData.VaiTro,
           PhongBan: formData.PhongBan,
           ChucVu: formData.ChucVu,
         };
-<<<<<<< Updated upstream
-        
-        if (!updateData.MatKhau) {
-          delete updateData.MatKhau;
-        }
-        
-        await axios.put(`https://devicems-hd3z.onrender.com/api/account/update/${accountData.ID_TK}`, formData, config);
-      } else {
-
-
-        
-        await axios.post("https://devicems-hd3z.onrender.com/api/account/create", formData, config);
-
 
         await axios.put(
           `https://devicems-hd3z.onrender.com/api/account/update/${accountData.ID_TK}`,
@@ -116,7 +87,7 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
           config
         );
 
-        alert("Cập nhật thành công!");
+        toast.success("Cập nhật thành công!");
       } else {
         await axios.post(
           "https://devicems-hd3z.onrender.com/api/account/create",
@@ -124,37 +95,43 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
           config
         );
 
+        toast.success("Tạo tài khoản thành công!");
       }
 
       refresh();
       onClose();
     } catch (err) {
-
       console.error(err);
-      toast.error(err.response?.data?.message || "Lỗi khi xử lý tài khoản");
-
-      alert(err.response?.data?.message || "Lỗi server");
-
+      toast.error(
+        err.response?.data?.message || "Lỗi khi xử lý tài khoản"
+      );
     }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+      <form
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+      >
         <h3>{isEdit ? "Cập nhật tài khoản" : "Thêm tài khoản"}</h3>
 
         <input
           value={formData.HoTen}
-          onChange={(e) => setFormData({ ...formData, HoTen: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, HoTen: e.target.value })
+          }
           placeholder="Họ tên"
         />
-
 
         <input
           value={formData.TenDangNhap}
           placeholder="Username"
           onChange={(e) => {
-            const username = e.target.value.toLowerCase().replace(/\s+/g, "");
+            const username = e.target.value
+              .toLowerCase()
+              .replace(/\s+/g, "");
 
             setFormData((prev) => ({
               ...prev,
@@ -165,26 +142,36 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
           disabled={isEdit}
         />
 
-
         <input value={formData.Email} disabled />
-        <select value={formData.VaiTro} onChange={(e) => handleRoleChange(e.target.value)}>
+
+        <select
+          value={formData.VaiTro}
+          onChange={(e) => handleRoleChange(e.target.value)}
+        >
           <option value="ADMIN">ADMIN</option>
           <option value="HR">HR</option>
           <option value="NHANVIEN">NHANVIEN</option>
         </select>
 
-       
         <input value={formData.PhongBan} disabled />
 
         {!isEdit && (
           <input
             type="password"
             placeholder="Mật khẩu"
-            onChange={(e) => setFormData({ ...formData, MatKhau: e.target.value })}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                MatKhau: e.target.value,
+              })
+            }
           />
         )}
 
-        <button type="submit">{isEdit ? "Cập nhật" : "Tạo mới"}</button>
+        <button type="submit">
+          {isEdit ? "Cập nhật" : "Tạo mới"}
+        </button>
+
         <button type="button" onClick={onClose}>
           Hủy
         </button>
