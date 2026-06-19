@@ -96,21 +96,12 @@ const normalizeExcelHeader = (value) =>
     .replace(/[^a-z0-9]/g, "");
 
 const EXCEL_HEADERS = {
-<<<<<<< HEAD
   TenThietBi: ["tenthietbi"],
   LoaiThietBi: ["loaithietbi"],
   SoLuong: ["soluong"],
   SeriNumber: ["soseri", "serinumber", "serialnumber"],
   NgayMua: ["ngaymua"],
   GiaTri: ["giatri", "nguyengia"],
-=======
-  TenThietBi: ["Tên thiết bị", "tenthietbi"],
-  LoaiThietBi: ["Loại thiết bị", "loaithietbi"],
-  SoLuong: ["Số lượng", "soluong"],
-  SeriNumber: ["Số Seri", "serinumber"],
-  NgayMua: ["Ngày mua", "ngaymua"],
-  GiaTri: ["Giá trị", "giatri", "nguyengia"],
->>>>>>> a174f2bec1b8a85ef122769fec29db05e97eb0cd
 };
 
 const normalizeExcelRow = (row) => {
