@@ -34,13 +34,13 @@ const STATUS_LABEL = {
 export default function Devices() {
   const navigate = useNavigate();
 
-  // Role
+  
   const role = (localStorage.getItem("role") || "").toUpperCase();
   const isUser = role === "NHANVIEN";
   const isHR = role === "HR";
   const isAdmin = role === "ADMIN";
 
-  // List state
+  
   const [devices, setDevices] = useState([]);
   const [total, setTotal] = useState(0);
   const [searchInput, setSearchInput] = useState("");
@@ -51,19 +51,19 @@ export default function Devices() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Batch filter
+  
   const [batches, setBatches] = useState([]);
   const [batchFilter, setBatchFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  // Categories
+  
   const [categories, setCategories] = useState([]);
 
-  // Metrics state
+  
   const [metrics, setMetrics] = useState({ total: 0, available: 0, assigned: 0, disposed: 0 });
 
-  // Edit modal state (single device edit)
+  
   const [openEditModal, setOpenEditModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ ...EMPTY_EDIT_FORM });
@@ -106,7 +106,7 @@ export default function Devices() {
       const res = await axios.get(`${API_URL}/batches`, { headers: authHeader() });
       setBatches(res.data.batches || []);
     } catch {
-      // ignore
+      
     }
   }, [authHeader]);
 
@@ -142,7 +142,7 @@ export default function Devices() {
         disposed: disposedCount,
       });
     } catch {
-      // ignore
+      
     }
   }, [authHeader, isUser]);
 
@@ -200,7 +200,7 @@ export default function Devices() {
     currentPage * itemsPerPage
   );
 
-  // ── Single edit modal ───────────────────────────────────────────
+  
   const handleOpenEditModal = (device) => {
     setEditingId(device.MaTB);
     setEditForm({
@@ -268,7 +268,7 @@ export default function Devices() {
           <span className="module-count">{total.toLocaleString("vi-VN")} thiết bị</span>
         </div>
 
-        {/* Metrics Overview Panels */}
+        {}
         {!isUser && (
           <div className="dashboard-metrics" style={{ marginBottom: "28px" }}>
             <div className="metric-panel metric-panel-strong">
@@ -494,7 +494,7 @@ export default function Devices() {
           onPageChange={setCurrentPage} 
         />
 
-        {/* ── Single edit modal ──────────────────────────────────── */}
+        {}
         {openEditModal && (
           <div className="modal-overlay" onClick={() => setOpenEditModal(false)}>
             <div className="device-modal" onClick={(event) => event.stopPropagation()}>

@@ -61,18 +61,18 @@ export default function ProductCategories() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Batch filter
+  
   const [batches, setBatches] = useState([]);
   const [batchFilter, setBatchFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  // Batch create modal
+  
   const [openBatchModal, setOpenBatchModal] = useState(false);
   const [batchId, setBatchId] = useState("");
   const [batchRows, setBatchRows] = useState([{ ...EMPTY_ROW }]);
   const [batchError, setBatchError] = useState("");
 
-  // Edit modal
+  
   const [openEditModal, setOpenEditModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ ...EMPTY_EDIT_FORM });
@@ -115,7 +115,7 @@ export default function ProductCategories() {
       const res = await axios.get(`${API_URL}/batches`, { headers: authHeader() });
       setBatches(res.data.batches || []);
     } catch {
-      // không cần alert
+      
     }
   }, [authHeader]);
 
@@ -161,7 +161,7 @@ export default function ProductCategories() {
     currentPage * itemsPerPage
   );
 
-  // ── Batch create modal ──────────────────────────────────────────
+  
   const openBatchCreateModal = () => {
     setBatchId(generateBatchId());
     setBatchRows([{ ...EMPTY_ROW }]);
@@ -218,7 +218,7 @@ export default function ProductCategories() {
     }
   };
 
-  // ── Edit modal ──────────────────────────────────────────────────
+  
   const handleOpenEditModal = (category) => {
     setEditingId(category.ID_DM);
     setEditForm({
@@ -410,7 +410,7 @@ export default function ProductCategories() {
           onPageChange={setCurrentPage} 
         />
 
-        {/* ── Batch create modal ─────────────────────────────────── */}
+        {}
         {openBatchModal && (
           <div className="modal-overlay" onClick={() => setOpenBatchModal(false)}>
             <div className="device-modal batch-modal" onClick={(event) => event.stopPropagation()}>
@@ -521,7 +521,7 @@ export default function ProductCategories() {
           </div>
         )}
 
-        {/* ── Edit modal ─────────────────────────────────────────── */}
+        {}
         {openEditModal && (
           <div className="modal-overlay" onClick={() => setOpenEditModal(false)}>
             <div className="device-modal" onClick={(event) => event.stopPropagation()}>

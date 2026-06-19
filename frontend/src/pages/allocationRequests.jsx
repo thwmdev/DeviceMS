@@ -60,7 +60,7 @@ const generateBatchId = () => {
   return `${date}_${time}_${rand}`;
 };
 
-/** Decode JWT payload để lấy id_nv */
+
 const getEmployeeIdFromToken = () => {
   try {
     const token = localStorage.getItem("token");
@@ -100,13 +100,13 @@ export default function AllocationRequests() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Batch create modal
+  
   const [openCreateModal, setOpenCreateModal] = useState(false);
   const [batchId, setBatchId] = useState("");
   const [batchRows, setBatchRows] = useState([{ ...EMPTY_REQUEST_ROW }]);
   const [batchError, setBatchError] = useState("");
 
-  // Batch filter
+  
   const [batches, setBatches] = useState([]);
   const [batchFilter, setBatchFilter] = useState("");
 
@@ -157,7 +157,7 @@ export default function AllocationRequests() {
       const res = await axios.get(`${API_URL}/batches`, { headers: authHeader() });
       setBatches(res.data.batches || []);
     } catch {
-      // không cần alert
+      
     }
   }, [authHeader]);
 
@@ -209,12 +209,12 @@ export default function AllocationRequests() {
     currentPage * itemsPerPage
   );
 
-  // ── Batch create modal ──────────────────────────────────────────
+  
   const openNewRequest = () => {
     const newBatchId = generateBatchId();
     setBatchId(newBatchId);
 
-    // Sinh row dau tien - neu la NHANVIEN thi tu dien ID_NV
+    
     const firstRow = { ...EMPTY_REQUEST_ROW };
     if (isUser) {
       const empId = getEmployeeIdFromToken();
@@ -229,7 +229,7 @@ export default function AllocationRequests() {
     setBatchRows((prev) => prev.map((row, i) => {
       if (i !== index) return row;
       const updated = { ...row, [key]: value };
-      // Khi đổi loại yêu cầu → reset trường liên quan
+      
       if (key === "LoaiYeuCau") {
         updated.ID_TB = "";
         updated.ID_CP = "";
@@ -294,7 +294,7 @@ export default function AllocationRequests() {
     }
   };
 
-  // ── Review modal ────────────────────────────────────────────────
+  
   const openReview = (requestItem, action) => {
     setReviewTarget(requestItem);
     setReviewAction(action);
@@ -470,7 +470,7 @@ export default function AllocationRequests() {
           onPageChange={setCurrentPage} 
         />
 
-        {/* ── Batch create modal ─────────────────────────────────── */}
+        {}
         {openCreateModal && (
           <div className="modal-overlay" onClick={() => setOpenCreateModal(false)}>
             <div className="device-modal batch-modal wide-modal" onClick={(event) => event.stopPropagation()}>
@@ -508,7 +508,7 @@ export default function AllocationRequests() {
                         <tr key={idx}>
                           <td style={{ textAlign: "center", color: "var(--text-muted, #888)" }}>{idx + 1}</td>
 
-                          {/* Loại yêu cầu */}
+                          {}
                           <td>
                             <select
                               style={{ width: "100%" }}
@@ -520,7 +520,7 @@ export default function AllocationRequests() {
                             </select>
                           </td>
 
-                          {/* Nhan vien bi khoa truong nhan vien */}
+                          {}
                           <td>
                             {row.LoaiYeuCau === "CAP_PHAT" ? (
                               <select
@@ -543,7 +543,7 @@ export default function AllocationRequests() {
                             )}
                           </td>
 
-                          {/* Thiết bị hoặc lịch sử cấp phát */}
+                          {}
                           <td>
                             {row.LoaiYeuCau === "CAP_PHAT" ? (
                               <select
@@ -574,7 +574,7 @@ export default function AllocationRequests() {
                             )}
                           </td>
 
-                          {/* Ngày trả (chỉ CAP_PHAT) */}
+                          {}
                           <td>
                             {row.LoaiYeuCau === "CAP_PHAT" ? (
                               <input
@@ -588,7 +588,7 @@ export default function AllocationRequests() {
                             )}
                           </td>
 
-                          {/* Lý do */}
+                          {}
                           <td>
                             <input
                               type="text"
@@ -599,7 +599,7 @@ export default function AllocationRequests() {
                             />
                           </td>
 
-                          {/* Xóa dòng */}
+                          {}
                           <td style={{ textAlign: "center" }}>
                             {batchRows.length > 1 && (
                               <button
@@ -638,7 +638,7 @@ export default function AllocationRequests() {
           </div>
         )}
 
-        {/* ── Review modal ───────────────────────────────────────── */}
+        {}
         {reviewTarget && (
           <div className="modal-overlay" onClick={closeReview}>
             <div className="device-modal wide-modal" onClick={(event) => event.stopPropagation()}>

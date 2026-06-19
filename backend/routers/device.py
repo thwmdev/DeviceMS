@@ -81,17 +81,17 @@ def add_device():
 
         ten_danh_muc = str(data["LoaiThietBi"]).strip()
 
-        # 1. Tra cứu danh mục theo tên để lấy ID_DM và ThoiGianKhauHao
+        
         cursor.execute(
             "SELECT ID_DM, ThoiGianKhauHao FROM DANHMUCSANPHAM WHERE TenDanhMuc = %s AND TrangThai = 'HoatDong'",
             (ten_danh_muc,)
         )
         dm_row = cursor.fetchone()
         id_dm = dm_row["ID_DM"] if dm_row else None
-        # Ưu tiên: ThoiGianKhauHao từ danh mục → mặc định 5
+        
         thoi_gian = int(dm_row["ThoiGianKhauHao"]) if (dm_row and dm_row["ThoiGianKhauHao"]) else 5
 
-        # 2. Tạo thiết bị — lưu cả Loai (tên) và ID_DM (khoá ngoại)
+        
         nguyen_gia = data.get("GiaTri") or data.get("NguyenGia") or 0
         ma_dot     = str(data.get("MaDot") or "").strip() or None
         seri       = str(data.get("SeriNumber") or "").strip() or None
@@ -99,7 +99,7 @@ def add_device():
         from models.devices import normalize_status_for_db
         trang_thai = normalize_status_for_db(data.get("TrangThai", "SanSang"))
 
-        # Lấy ID tự tăng tiếp theo
+        
         cursor.execute("SELECT COALESCE(MAX(ID_TB), 0) + 1 FROM THIETBI")
         device_id = cursor.fetchone()["COALESCE(MAX(ID_TB), 0) + 1"]
 
@@ -121,7 +121,7 @@ def add_device():
             ),
         )
 
-        # 3. Tạo bản ghi KHAUHAO mặc định từ danh mục
+        
         cursor.execute(
             """
             INSERT INTO KHAUHAO (ID_TB, PhuongPhapTinh, ThoiGianSuDung, GiaTriThuHoi, GiaTriBanDau)
@@ -203,7 +203,7 @@ def dispose_batch():
         if not str(batch_id).strip():
             return jsonify({"message": "Mã đợt thanh lý không được để trống."}), 400
 
-        # Validate that all device_ids are integers
+        
         valid_ids = []
         for d in device_ids:
             try:
@@ -241,7 +241,7 @@ def update_device_life(matb):
             return jsonify({"message": "Thời gian sử dụng phải là số dương."}), 400
 
         new_life = int(new_life)
-        # reset_history=true → xóa LICHSUKHAUHAO để tính lại từ đầu
+        
         reset_history = data.get("reset_history", False)
 
         conn = get_connection()

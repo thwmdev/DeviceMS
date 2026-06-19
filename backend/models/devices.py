@@ -51,7 +51,7 @@ def _ensure_device_columns():
             return
         cursor = conn.cursor(dictionary=True)
         
-        # Thêm MaDot
+        
         cursor.execute(
             """
             SELECT COUNT(*) AS cnt
@@ -65,7 +65,7 @@ def _ensure_device_columns():
             cursor.execute("ALTER TABLE THIETBI ADD COLUMN MaDot VARCHAR(50) NULL")
             conn.commit()
             
-        # Thêm NgayThanhLy
+        
         cursor.execute(
             """
             SELECT COUNT(*) AS cnt
@@ -79,7 +79,7 @@ def _ensure_device_columns():
             cursor.execute("ALTER TABLE THIETBI ADD COLUMN NgayThanhLy DATETIME NULL")
             conn.commit()
 
-        # Thêm NgayTao
+        
         cursor.execute(
             """
             SELECT COUNT(*) AS cnt
@@ -95,7 +95,7 @@ def _ensure_device_columns():
             cursor.execute("UPDATE THIETBI SET NgayTao = COALESCE(NgayMua, CURRENT_TIMESTAMP()) WHERE NgayTao IS NULL")
             conn.commit()
 
-        # Thêm MaDotThanhLy
+        
         cursor.execute(
             """
             SELECT COUNT(*) AS cnt
@@ -280,7 +280,7 @@ def create_device(data):
         ten_danh_muc = str(data["LoaiThietBi"]).strip()
         nguyen_gia = data.get("GiaTri") or data.get("NguyenGia") or 0
 
-        # --- 1. Tra cứu / tạo danh mục, lấy ID_DM + ThoiGianKhauHao ---
+        
         cursor.execute(
             "SELECT ID_DM, ThoiGianKhauHao FROM DANHMUCSANPHAM WHERE TenDanhMuc = %s",
             (ten_danh_muc,)
@@ -291,7 +291,7 @@ def create_device(data):
             id_dm    = dm_row["ID_DM"]
             thoi_gian = int(dm_row["ThoiGianKhauHao"]) if dm_row["ThoiGianKhauHao"] else 5
         else:
-            # Danh mục chưa tồn tại → tự tạo, dùng mặc định 5 năm
+            
             import uuid
             ma_danh_muc = f"DM_{str(uuid.uuid4())[:6].upper()}"
             cursor.execute(
@@ -301,7 +301,7 @@ def create_device(data):
             id_dm     = cursor.lastrowid
             thoi_gian = 5
 
-        # --- 2. Lấy ID tiếp theo ---
+        
         cursor.execute(
             f"""
             INSERT INTO {TABLE_NAME} (TenThietBi, Loai, ID_DM, SeriNumber, NgayMua, NguyenGia, TrangThai, MaDot)
@@ -311,7 +311,7 @@ def create_device(data):
         )
         device_id = cursor.lastrowid
 
-        # --- 4. Tạo bản ghi KHAUHAO tự động từ ThoiGianKhauHao của danh mục ---
+        
         cursor.execute(
             """
             INSERT INTO KHAUHAO (ID_TB, PhuongPhapTinh, ThoiGianSuDung, GiaTriThuHoi, GiaTriBanDau)
@@ -456,10 +456,10 @@ def batch_dispose_devices(device_ids, batch_id):
 
         cursor = conn.cursor(dictionary=True)
         
-        # Tạo chuỗi tham số %s, %s, ...
+        
         placeholders = ', '.join(['%s'] * len(device_ids))
         
-        # Kiểm tra xem có thiết bị nào đang cấp phát không
+        
         cursor.execute(
             f"SELECT ID_TB, TrangThai FROM {TABLE_NAME} WHERE ID_TB IN ({placeholders})",
             tuple(device_ids),
@@ -478,7 +478,7 @@ def batch_dispose_devices(device_ids, batch_id):
         cursor.close()
         cursor = conn.cursor()
         
-        # Cập nhật hàng loạt
+        
         params = ["THANH_LY", batch_id] + list(device_ids)
         cursor.execute(
             f"UPDATE {TABLE_NAME} SET TrangThai = %s, NgayThanhLy = CURRENT_TIMESTAMP, MaDotThanhLy = %s WHERE ID_TB IN ({placeholders})",

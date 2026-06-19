@@ -284,7 +284,7 @@ def update_category(category_id, data):
             ),
         )
         
-        # Update device table if category name changed
+        
         if old_name != payload["TenDanhMuc"]:
             cursor.execute("UPDATE THIETBI SET Loai = %s WHERE Loai = %s", (payload["TenDanhMuc"], old_name))
 

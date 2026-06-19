@@ -109,7 +109,7 @@ def _add_column_if_missing(conn, table_name, column_name, definition):
     cursor = conn.cursor()
     try:
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
-        # Consume any result MySQL Connector might leave after DDL
+        
         try:
             cursor.fetchall()
         except Exception:
@@ -140,7 +140,7 @@ def ensure_allocation_tables():
         if not conn:
             raise Exception("Khong the ket noi co so du lieu.")
 
-        # Tạo bảng nếu chưa tồn tại — mỗi DDL dùng cursor riêng
+        
         _run_ddl(conn, f"""
             CREATE TABLE IF NOT EXISTS {REQUEST_TABLE} (
                 ID_YC INT PRIMARY KEY,
@@ -180,7 +180,7 @@ def ensure_allocation_tables():
             )
         """)
 
-        # Thêm cột nếu chưa có — mỗi thêm dùng cursor riêng
+        
         _add_column_if_missing(conn, REQUEST_TABLE, "ID_TB", "INT NULL")
         _add_column_if_missing(conn, REQUEST_TABLE, "LyDo", "VARCHAR(255) NULL")
         _add_column_if_missing(conn, REQUEST_TABLE, "NgayTraDuKien", "DATE NULL")
@@ -294,7 +294,7 @@ def get_allocation_options(employee_id=None):
         )
         available_devices = [_map_device(row) for row in cursor.fetchall()]
 
-        # Nếu có employee_id, chỉ lấy các cấp phát của nhân viên đó
+        
         extra_where = ""
         extra_params = [RETURNED_ASSIGNMENT_STATUS, "ThuHoi"]
         if employee_id:

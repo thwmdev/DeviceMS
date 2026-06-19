@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-// Import chuẩn trỏ vào đúng file login trong thư mục con của bạn
+
 import Login from "./pages/login"; 
 import AllocationRequests from "./pages/allocationRequests";
 import Devices from "./pages/devices"

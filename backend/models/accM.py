@@ -56,7 +56,7 @@ def create_account_db(data):
         
         
         
-        #vào TAIKHOAN
+        
         hashed_pw = hash_password(str(mat_khau))
         role = _clean_account_role(data.get("VaiTro", "NHANVIEN"))
         cursor.execute("INSERT INTO TAIKHOAN (ID_NV, TenDangNhap, MatKhau, VaiTro) VALUES (%s, %s, %s, %s)", 
@@ -86,7 +86,7 @@ def toggle_account_status_db(matk):
         if not result:
             raise Exception("Tài khoản không tồn tại")
         
-        # Bây giờ result['TrangThai'] sẽ hoạt động đúng
+        
         new_status = 'TamDung' if result['TrangThai'] == 'HoatDong' else 'HoatDong'
         
         cursor.execute("UPDATE TAIKHOAN SET TrangThai = %s WHERE ID_TK = %s", (new_status, matk))

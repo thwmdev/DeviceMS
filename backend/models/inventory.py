@@ -17,7 +17,7 @@ def get_inventory_stats():
         
         cursor = conn.cursor(dictionary=True)
         
-        # 1. Thống kê theo Loại thiết bị (Categories)
+        
         query_categories = """
             SELECT 
                 Loai AS Category,
@@ -43,7 +43,7 @@ def get_inventory_stats():
                 "value": float(r["TotalValue"])
             })
 
-        # 2. Thống kê theo dòng máy (Models)
+        
         query_models = """
             SELECT 
                 TenThietBi AS ModelName,
@@ -173,12 +173,12 @@ def get_inventory_transactions(limit=100):
         
         cursor = conn.cursor(dictionary=True)
         
-        # Lấy lịch sử: 
-        # 1. Nhập kho theo đợt (GOM NHÓM theo MaDot nếu có MaDot)
-        # 2. Nhập kho đơn lẻ (nếu MaDot trống)
-        # 3. Xuất cấp phát (NgayCap)
-        # 4. Thu hồi (NgayThuHoi)
-        # 5. Thanh lý trực tiếp (NgayThanhLy)
+        
+        
+        
+        
+        
+        
         query = """
             (
                 SELECT 

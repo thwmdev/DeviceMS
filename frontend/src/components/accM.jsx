@@ -45,7 +45,7 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Kiểm tra dữ liệu
+    
     if (!formData.HoTen || !formData.TenDangNhap) {
       toast.warning("Vui lòng điền đủ thông tin!");
       return;
@@ -65,12 +65,12 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
         if (!updateData.MatKhau) {
           delete updateData.MatKhau;
         }
-        // Cập nhật
+        
         await axios.put(`https://devicems-hd3z.onrender.com/api/account/update/${accountData.ID_TK}`, formData, config);
       } else {
 
 
-        // Thêm 
+        
         await axios.post("https://devicems-hd3z.onrender.com/api/account/create", formData, config);
       }
       

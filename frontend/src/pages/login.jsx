@@ -34,7 +34,7 @@ const Login = () => {
         const role = getRoleFromAuthResponse(response.data);
         const storedRole = getCanonicalStoredRole(role);
 
-        // Luuw laij token vaf role vaof localStorage
+        
         localStorage.setItem("token", response.data.token);
         if (storedRole) {
           localStorage.setItem("role", storedRole);

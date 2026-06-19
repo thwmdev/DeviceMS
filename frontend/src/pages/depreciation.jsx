@@ -43,31 +43,31 @@ function MonthlyTab() {
       (item.Nam === namHT && item.Thang <= thangHT)
     );
   }, [chartData]);
-  // Fetch
+  
   const loadReport = async (t, n) => {
     try {
       const r = await axios.get(`${API}/report-by-month?thang=${t}&nam=${n}`, { headers: getHeaders() });
       setReport(r.data || []);
-    } catch { /* lỗi im lặng */ }
+    } catch {  }
   };
 
   const loadChart = async () => {
     try {
       const r = await axios.get(`${API}/chart-data`, { headers: getHeaders() });
       setChartData(r.data || []);
-    } catch { /* lỗi im lặng */ }
+    } catch {  }
   };
 
   useEffect(() => { loadReport(filter.thang, filter.nam); }, [filter]);
   useEffect(() => { loadChart(); }, []);
 
-  // Search debounce
+  
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 400);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Chạy khấu hao
+  
   const handleRun = async () => {
     setRunning(true);
     try {
@@ -82,7 +82,7 @@ function MonthlyTab() {
     }
   };
 
-  // Cập nhật thời gian sử dụng
+  
   const updateLife = async (maTB, curVal, newVal) => {
     if (Number(newVal) === Number(curVal) || !newVal || newVal <= 0) return;
 
@@ -114,7 +114,7 @@ function MonthlyTab() {
   };
 
 
-  // Excel
+  
   const exportExcel = () => {
     const ws = XLSX.utils.json_to_sheet(report.map((r) => ({
       "Mã TS": "TB" + String(r.MaTB).padStart(3, "0"),
@@ -133,7 +133,7 @@ function MonthlyTab() {
     XLSX.writeFile(wb, `KhauHao_T${filter.thang}_${filter.nam}.xlsx`);
   };
 
-  // Summary
+  
   const summary = report.reduce(
     (a, c) => ({
       nguyen: a.nguyen + Number(c.NguyenGia || 0),
@@ -144,7 +144,7 @@ function MonthlyTab() {
     { nguyen: 0, khauHao: 0, luyKe: 0, conLai: 0 }
   );
 
-  // Filter & sort
+  
   const filtered = useMemo(() => {
     if (!search) return report;
     const q = search.toLowerCase();
@@ -161,7 +161,7 @@ function MonthlyTab() {
 
   return (
     <>
-      {/* Filter bar */}
+      {}
       <div className="filter-bar">
         <label>Tháng:</label>
         <select value={filter.thang} onChange={(e) => setFilter((f) => ({ ...f, thang: +e.target.value }))}>
@@ -182,7 +182,7 @@ function MonthlyTab() {
         </button>
       </div>
 
-      {/* Summary */}
+      {}
       <div className="summary-grid">
         <div className="summary-card" style={{ borderLeftColor: "#3b82f6" }}>
           <div className="card-label">Tổng Nguyên giá</div>
@@ -202,13 +202,13 @@ function MonthlyTab() {
         </div>
       </div>
 
-      {/* Chart */}
+      {}
       <div className="chart-card">
         <h3>Tổng khấu hao theo tháng (12 tháng gần nhất)</h3>
         <TotalDepreChart data={filteredChart} />
       </div>
 
-      {/* Toolbar */}
+      {}
       <div className="table-toolbar">
         <div style={{ display: "flex", gap: "8px" }}>
           <button className="btn-secondary" onClick={exportExcel}>⬇ Xuất Excel</button>
@@ -221,7 +221,7 @@ function MonthlyTab() {
         />
       </div>
 
-      {/* Table */}
+      {}
       <div className="depre-table-wrap">
         <table className="depre-table">
           <thead>
@@ -291,7 +291,7 @@ function DeviceTab() {
   const [history, setHistory]   = useState([]);
   const [loading, setLoading]   = useState(false);
 
-  // Filter cho list thiết bị
+  
   const [searchDev, setSearchDev] = useState("");
   const [statusDev, setStatusDev] = useState("");
 
@@ -335,7 +335,7 @@ function DeviceTab() {
     return res;
   }, [devices, searchDev, statusDev]);
 
-  // Tổng lũy kế gần
+  
   const latestRow = history.length > 0 ? history[history.length - 1] : null;
 
   return (
@@ -415,7 +415,7 @@ function DeviceTab() {
             </div>
           )}
 
-          {/* Biểu đồ */}
+          {}
           <div className="chart-card" style={{ marginTop: "16px" }}>
             <h3>Biểu đồ hao mòn — {selectedInfo?.TenThietBi}</h3>
             {loading ? (
@@ -427,7 +427,7 @@ function DeviceTab() {
             )}
           </div>
 
-          {/* Bảng lịch sử */}
+          {}
           <div className="depre-table-wrap" style={{ marginTop: "16px" }}>
             <table className="depre-table">
               <thead>
@@ -444,7 +444,7 @@ function DeviceTab() {
                     <td colSpan={4}>Chưa có lịch sử tính khấu hao cho thiết bị này</td>
                   </tr>
                 ) : (
-                  // Hiển thị từ mới nhất xuống cũ nhất
+                  
                   [...history].reverse().map((h, idx) => (
                     <tr key={idx}>
                       <td style={{ fontWeight: 600 }}>
@@ -473,7 +473,7 @@ export default function Depreciation() {
     <div className="depre-page">
       <Sidebar />
       <main className="depre-main">
-        {/* Header */}
+        {}
         <div className="depre-header">
           <h1>Quản lý Khấu hao</h1>
           <div className="tab-group">

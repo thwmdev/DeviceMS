@@ -31,7 +31,7 @@ def save_depreciation(data):
 
         nguyen_gia = float(device["NguyenGia"])
 
-        # Lấy ngày cấp phát đầu tiên thay vì ngày mua
+        
         cursor.execute("""
             SELECT MIN(NgayCap) AS NgayCapDauTien
             FROM LICHSUCAPPHAT
@@ -140,7 +140,7 @@ def caculate_depre(thang=None, nam=None):
                 if not ngay_bat_dau:
                     ngay_bat_dau = date.today()
 
-            # Chưa cấp phát → không tính khấu hao
+            
             ngay_cap_dau = item.get("NgayCapDauTien")
             ngay_bat_dau_db = item.get("NgayBatDau")
 

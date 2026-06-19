@@ -71,9 +71,9 @@ const Accounts = () => {
   }
 
   try {
-    // Gọi API không cần gửi mật khẩu từ body nếu đã gán cứng ở server
+    
     await axios.put(`https://devicems-hd3z.onrender.com/api/account/reset-password/${acc.ID_TK}`, 
-      {}, // Gửi rỗng vì mật khẩu đã được xử lý ở server
+      {}, 
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
     );
     toast.success("Reset mật khẩu thành công!");

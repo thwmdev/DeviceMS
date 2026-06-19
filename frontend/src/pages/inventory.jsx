@@ -61,8 +61,8 @@ export default function Inventory() {
   const navigate = useNavigate();
   const excelInputRef = useRef(null);
 
-  // States
-  const [activeTab, setActiveTab] = useState("overview"); // overview, batches, history
+  
+  const [activeTab, setActiveTab] = useState("overview"); 
   const [loading, setLoading] = useState(false);
   const [currentPageBatches, setCurrentPageBatches] = useState(1);
   const [currentPageDisposeBatches, setCurrentPageDisposeBatches] = useState(1);
@@ -71,14 +71,14 @@ export default function Inventory() {
   const [currentPageModels, setCurrentPageModels] = useState(1);
   const itemsPerPage = 10;
 
-  // Sorting states
+  
   const [sortCategories, setSortCategories] = useState({ key: "category", direction: "asc" });
   const [sortModels, setSortModels] = useState({ key: "modelName", direction: "asc" });
   const [sortBatches, setSortBatches] = useState({ key: "date", direction: "desc" });
   const [sortDisposeBatches, setSortDisposeBatches] = useState({ key: "date", direction: "desc" });
   const [sortHistory, setSortHistory] = useState({ key: "NgayThucHien", direction: "desc" });
 
-  // Search states
+  
   const [searchCategory, setSearchCategory] = useState("");
   const [searchModel, setSearchModel] = useState("");
   const [searchBatch, setSearchBatch] = useState("");
@@ -87,7 +87,7 @@ export default function Inventory() {
   const [searchDisposeModal, setSearchDisposeModal] = useState("");
   const [historyTypeFilter, setHistoryTypeFilter] = useState("");
 
-  // New states for missing table features
+  
   const [currentPageBatchDetail, setCurrentPageBatchDetail] = useState(1);
   const [sortBatchDetail, setSortBatchDetail] = useState({ key: "MaThietBi", direction: "asc" });
   const [searchBatchDetail, setSearchBatchDetail] = useState("");
@@ -95,7 +95,7 @@ export default function Inventory() {
   const [batchDetailCategoryFilter, setBatchDetailCategoryFilter] = useState("");
   const [batchDetailStatusFilter, setBatchDetailStatusFilter] = useState("");
 
-  // Data
+  
   const [stats, setStats] = useState({ categories: [], models: [] });
   const [batches, setBatches] = useState([]);
   const [disposeBatches, setDisposeBatches] = useState([]);
@@ -103,7 +103,7 @@ export default function Inventory() {
   const [categories, setCategories] = useState([]);
   const [availableDevices, setAvailableDevices] = useState([]);
 
-  // Modals
+  
   const [openImportModal, setOpenImportModal] = useState(false);
   const [importBatchId, setImportBatchId] = useState("");
   const [importRows, setImportRows] = useState([{ ...EMPTY_DEVICE_ROW }]);
@@ -114,14 +114,14 @@ export default function Inventory() {
   const [selectedDisposeIds, setSelectedDisposeIds] = useState(new Set());
   const [disposeError, setDisposeError] = useState("");
 
-  // Batch Detail Modal
+  
   const [openBatchDetailModal, setOpenBatchDetailModal] = useState(false);
-  const [batchDetailType, setBatchDetailType] = useState("import"); // "import" or "dispose"
+  const [batchDetailType, setBatchDetailType] = useState("import"); 
   const [selectedBatchId, setSelectedBatchId] = useState("");
   const [batchDevices, setBatchDevices] = useState([]);
   const [loadingBatchDevices, setLoadingBatchDevices] = useState(false);
 
-  // Auth
+  
   const authHeader = useCallback(() => ({
     Authorization: `Bearer ${localStorage.getItem("token")}`,
   }), []);
@@ -133,7 +133,7 @@ export default function Inventory() {
     }
   }, [navigate]);
 
-  // Loaders
+  
   const loadStats = useCallback(async () => {
     try {
       setLoading(true);
@@ -185,7 +185,7 @@ export default function Inventory() {
   const loadAvailableDevices = useCallback(async () => {
     try {
       const res = await axios.get(`${DEVICE_API_URL}/list?limit=1000`, { headers: authHeader() });
-      // Lọc các thiết bị có trạng thái Sẵn sàng để thanh lý
+      
       const list = (res.data.data || []).filter((d) => d.TrangThai === "SAN_SANG");
       setAvailableDevices(list);
     } catch (err) {
@@ -193,7 +193,7 @@ export default function Inventory() {
     }
   }, [authHeader, handleAuthError]);
 
-  // Initial Load
+  
   useEffect(() => {
     loadStats();
     loadBatches();
@@ -202,7 +202,7 @@ export default function Inventory() {
     loadCategories();
   }, [loadStats, loadBatches, loadDisposeBatches, loadHistory, loadCategories]);
 
-  // Tab switcher refresh
+  
   const handleTabChange = (tabName) => {
     setActiveTab(tabName);
     if (tabName === "batches") { setCurrentPageBatches(1); loadBatches(); }
@@ -215,7 +215,7 @@ export default function Inventory() {
     }
   };
 
-  // Sắp xếp & phân trang Tồn kho danh mục
+  
   const filteredCategories = useMemo(() => {
     if (!stats.categories) return [];
     let list = stats.categories.filter((item) => 
@@ -227,7 +227,7 @@ export default function Inventory() {
   const totalCategoryPages = Math.ceil(filteredCategories.length / itemsPerPage) || 1;
   const currentCategories = filteredCategories.slice((currentPageCategories - 1) * itemsPerPage, currentPageCategories * itemsPerPage);
 
-  // Sắp xếp & phân trang Tồn kho theo dòng máy
+  
   const filteredModels = useMemo(() => {
     if (!stats.models) return [];
     let list = stats.models.filter((item) => 
@@ -243,7 +243,7 @@ export default function Inventory() {
   const totalModelPages = Math.ceil(filteredModels.length / itemsPerPage) || 1;
   const currentModels = filteredModels.slice((currentPageModels - 1) * itemsPerPage, currentPageModels * itemsPerPage);
 
-  // Lịch sử nhập
+  
   const filteredBatches = useMemo(() => {
     let list = batches.filter((b) => 
       b.batchId.toLowerCase().includes(searchBatch.toLowerCase()) ||
@@ -255,7 +255,7 @@ export default function Inventory() {
   const totalBatchPages = Math.ceil(filteredBatches.length / itemsPerPage) || 1;
   const currentBatches = filteredBatches.slice((currentPageBatches - 1) * itemsPerPage, currentPageBatches * itemsPerPage);
 
-  // Lịch sử thanh lý
+  
   const filteredDisposeBatches = useMemo(() => {
     let list = disposeBatches.filter((b) => 
       b.batchId.toLowerCase().includes(searchDisposeBatch.toLowerCase()) ||
@@ -267,7 +267,7 @@ export default function Inventory() {
   const totalDisposeBatchPages = Math.ceil(filteredDisposeBatches.length / itemsPerPage) || 1;
   const currentDisposeBatches = filteredDisposeBatches.slice((currentPageDisposeBatches - 1) * itemsPerPage, currentPageDisposeBatches * itemsPerPage);
 
-  // Lịch sử hoạt động kho
+  
   const filteredHistory = useMemo(() => {
     if (!history) return [];
     let list = history;
@@ -312,7 +312,7 @@ export default function Inventory() {
   const totalBatchDetailPages = Math.ceil(filteredBatchDetail.length / itemsPerPage) || 1;
   const currentBatchDetail = filteredBatchDetail.slice((currentPageBatchDetail - 1) * itemsPerPage, currentPageBatchDetail * itemsPerPage);
 
-  // ── Nhập kho Modal (Batch Input / Excel) ──────────────────────────
+  
   const openImport = () => {
     setImportBatchId(generateBatchId());
     setImportRows([{ ...EMPTY_DEVICE_ROW }]);
@@ -451,7 +451,7 @@ export default function Inventory() {
     }
   };
 
-  // ── Thanh lý kho Modal (Disposal) ──────────────────────────────────
+  
   const openDispose = async () => {
     setLoading(true);
     await loadAvailableDevices();
@@ -463,7 +463,7 @@ export default function Inventory() {
     setLoading(false);
   };
 
-  // Filtered individual devices in disposal modal
+  
   const filteredDisposeDevices = useMemo(() => {
     const q = searchDisposeModal.toLowerCase();
     if (!q) return availableDevices;
@@ -517,7 +517,7 @@ export default function Inventory() {
     }
   };
 
-  // ── Xem chi tiết thiết bị đợt ───────────────────────────────
+  
   const openBatchDetail = async (batchId, type = "import") => {
     setSelectedBatchId(batchId);
     setBatchDetailType(type);
@@ -558,7 +558,7 @@ export default function Inventory() {
             </div>
           </div>
 
-          {/* Tabs switcher */}
+          {}
           <div className="inventory-tabs">
             <button
               className={`inventory-tab-btn ${activeTab === "overview" ? "active" : ""}`}
@@ -587,14 +587,14 @@ export default function Inventory() {
           </div>
         </div>
 
-        {/* Tab 1: Overview */}
+        {}
         {activeTab === "overview" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
             {loading ? (
               <p>Đang tải dữ liệu báo cáo...</p>
             ) : (
               <>
-                {/* 1. Category stats table */}
+                {}
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                     <h2 style={{ fontSize: "16px", fontWeight: "760", color: "var(--accent)" }}>
@@ -664,7 +664,7 @@ export default function Inventory() {
                   />
                 </div>
 
-                {/* 2. Model stats table */}
+                {}
                 <div style={{ marginTop: "24px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                     <h2 style={{ fontSize: "16px", fontWeight: "760", color: "var(--accent)" }}>
@@ -743,7 +743,7 @@ export default function Inventory() {
           </div>
         )}
 
-        {/* Tab 2: Batches */}
+        {}
         {activeTab === "batches" && (
           <div className="table-container">
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
@@ -833,7 +833,7 @@ export default function Inventory() {
           </div>
         )}
 
-        {/* Tab: Dispose Batches */}
+        {}
         {activeTab === "dispose_batches" && (
           <div className="table-container">
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
@@ -909,7 +909,7 @@ export default function Inventory() {
           </div>
         )}
 
-        {/* Tab 3: Detailed History timeline */}
+        {}
         {activeTab === "history" && (
           <div className="timeline-list">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "var(--card-bg, #ffffff)", padding: "12px 16px", borderRadius: "10px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
@@ -994,7 +994,7 @@ export default function Inventory() {
           </div>
         )}
 
-        {/* ── Modal Nhập kho ──────────────────────────────────────── */}
+        {}
         {openImportModal && (
           <div className="modal-overlay" onClick={() => setOpenImportModal(false)}>
             <div className="device-modal batch-modal wide-modal" onClick={(e) => e.stopPropagation()}>
@@ -1145,7 +1145,7 @@ export default function Inventory() {
           </div>
         )}
 
-        {/* ── Modal Thanh lý (Batch) ──────────────────────────────────────── */}
+        {}
         {openDisposeModal && (
           <div className="modal-overlay" onClick={() => setOpenDisposeModal(false)}>
             <div className="device-modal batch-modal wide-modal" onClick={(e) => e.stopPropagation()}>
@@ -1249,7 +1249,7 @@ export default function Inventory() {
           </div>
         )}
 
-        {/* ── Modal Chi tiết đợt nhập ─────────────────────────────────── */}
+        {}
         {openBatchDetailModal && (
           <div className="modal-overlay" onClick={() => setOpenBatchDetailModal(false)}>
             <div className="device-modal wide-modal" onClick={(e) => e.stopPropagation()}>

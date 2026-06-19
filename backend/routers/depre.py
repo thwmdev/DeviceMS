@@ -7,7 +7,7 @@ import datetime
 depre_bp = Blueprint("depreciation", __name__)
 
 
-# ─── Cấu hình phương pháp khấu hao cho một thiết bị ─────────────────────────
+
 @depre_bp.route("", methods=["POST"])
 @token_and_role_required(allowed_roles=["ADMIN"])
 def set_depreciation():
@@ -69,12 +69,12 @@ def cleanup_and_recalc():
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # 1. Xóa toàn bộ lịch sử cũ
+        
         cursor.execute("DELETE FROM LICHSUKHAUHAO")
         deleted = cursor.rowcount
         conn.commit()
 
-        # 2. Tìm tháng cấp phát sớm nhất trong hệ thống
+        
         cursor.execute("""
             SELECT MIN(NgayCap) AS EarliestAlloc
             FROM LICHSUCAPPHAT
@@ -87,14 +87,14 @@ def cleanup_and_recalc():
                 "message": f"Đã xóa {deleted} bản ghi cũ. Không có thiết bị nào được cấp phát, không cần tính lại."
             }), 200
 
-        # Chuyển về date nếu cần
+        
         if hasattr(earliest, 'date'):
             earliest = earliest.date()
 
         now = datetime.datetime.now()
         inserted_total = 0
 
-        # 3. Chạy từ tháng cấp phát sớm nhất → tháng hiện tại
+        
         y, m = earliest.year, earliest.month
         while (y < now.year) or (y == now.year and m <= now.month):
             try:
@@ -244,7 +244,7 @@ def get_depre_devices():
         conn.close()
 
 
-# ─── Lịch sử khấu hao 1 thiết bị theo tháng (tab 2) ─────────────────────────
+
 @depre_bp.route("/history/<int:ma_tb>", methods=["GET"])
 @token_and_role_required(allowed_roles=["ADMIN", "HR", "NHANVIEN"])
 def get_depreciation_history(ma_tb):
@@ -325,7 +325,7 @@ def generate_config():
         conn.close()
 
 
-# ─── Kiểm tra khấu hao: so sánh ngày mua vs ngày cấp phát ────────────────
+
 @depre_bp.route("/verify", methods=["GET"])
 @token_and_role_required(allowed_roles=["ADMIN"])
 def verify_depreciation():
