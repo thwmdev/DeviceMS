@@ -63,12 +63,12 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
           delete updateData.MatKhau;
         }
         // Cập nhật
-        await axios.put(`http://127.0.0.1:5000/api/account/update/${accountData.ID_TK}`, formData, config);
+        await axios.put(`https://devicems-hd3z.onrender.com/api/account/update/${accountData.ID_TK}`, formData, config);
       } else {
 
 
         // Thêm 
-        await axios.post("http://127.0.0.1:5000/api/account/create", formData, config);
+        await axios.post("https://devicems-hd3z.onrender.com/api/account/create", formData, config);
       }
       
       refresh(); 

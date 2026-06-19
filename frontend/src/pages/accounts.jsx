@@ -15,7 +15,7 @@ const Accounts = () => {
 
   const fetchAccounts = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:5000/api/account/list", {
+      const res = await axios.get("https://devicems-hd3z.onrender.com/api/account/list", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       setAccounts(res.data);
@@ -28,7 +28,7 @@ const Accounts = () => {
 
   const handleToggle = async (id) => {
     try {
-      await axios.put(`http://127.0.0.1:5000/api/account/toggle-status/${id}`, {}, {
+      await axios.put(`https://devicems-hd3z.onrender.com/api/account/toggle-status/${id}`, {}, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       await fetchAccounts();
@@ -60,7 +60,7 @@ const Accounts = () => {
 
   try {
     // Gọi API không cần gửi mật khẩu từ body nếu đã gán cứng ở server
-    await axios.put(`http://127.0.0.1:5000/api/account/reset-password/${acc.ID_TK}`, 
+    await axios.put(`https://devicems-hd3z.onrender.com/api/account/reset-password/${acc.ID_TK}`, 
       {}, // Gửi rỗng vì mật khẩu đã được xử lý ở server
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
     );

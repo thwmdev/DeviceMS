@@ -1,8 +1,4 @@
-/* =============================================
-   QUẢN LÝ KHẤU HAO – CSS
-   ============================================= */
 
-/* ── Layout ─────────────────────────────────── */
 .depre-page { display: flex; min-height: 100vh; }
 
 .depre-main {
@@ -13,7 +9,6 @@
   overflow-x: hidden;
 }
 
-/* ── Header & Tabs ───────────────────────────── */
 .depre-header {
   display: flex;
   align-items: center;
@@ -88,7 +83,6 @@
 
 .filter-bar select:focus { border-color: #3b82f6; }
 
-/* ── Summary Cards ───────────────────────────── */
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

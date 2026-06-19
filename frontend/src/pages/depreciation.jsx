@@ -10,7 +10,7 @@ import { getNextSort, sortRows } from "../utils/tableSort";
 import "../styles/depre.css";
 import { toast } from "react-toastify";
 
-const API = "http://127.0.0.1:5000/api/depreciation";
+const API = "https://devicems-hd3z.onrender.com/api/depreciation";
 const fmtVND = (v) => Number(v || 0).toLocaleString("vi-VN") + " đ";
 
 function getHeaders() {
@@ -94,7 +94,7 @@ function MonthlyTab() {
     setSavingId(maTB);
     try {
       const res = await axios.put(
-        `http://127.0.0.1:5000/api/device/update-life/${maTB}`,
+        `https://devicems-hd3z.onrender.com/api/device/update-life/${maTB}`,
         { ThoiGianSuDung: Number(newVal), reset_history: resetHistory },
         { headers: getHeaders() }
       );
@@ -114,6 +114,7 @@ function MonthlyTab() {
       "Mã TS": "TB" + String(r.MaTB).padStart(3, "0"),
       "Tên tài sản": r.TenThietBi,
       "Ngày nhập": r.NgayMua ? new Date(r.NgayMua).toLocaleDateString("vi-VN") : "",
+      "Ngày cấp phát": r.NgayCapDauTien ? new Date(r.NgayCapDauTien).toLocaleDateString("vi-VN") : "",
       "Nguyên giá": r.NguyenGia,
       "TG sử dụng (năm)": r.ThoiGianSuDung,
       "KH tháng": r.GiaTriKhauHaoThang,
@@ -222,6 +223,7 @@ function MonthlyTab() {
               <th><SortableHeader label="Mã TS" sortKey="MaTB" sortConfig={sortCfg} onSort={(k) => setSortCfg((c) => getNextSort(c, k))} /></th>
               <th><SortableHeader label="Tên tài sản" sortKey="TenThietBi" sortConfig={sortCfg} onSort={(k) => setSortCfg((c) => getNextSort(c, k))} /></th>
               <th><SortableHeader label="Ngày nhập" sortKey="NgayMua" sortConfig={sortCfg} onSort={(k) => setSortCfg((c) => getNextSort(c, k))} /></th>
+              <th><SortableHeader label="Ngày cấp" sortKey="NgayCapDauTien" sortConfig={sortCfg} onSort={(k) => setSortCfg((c) => getNextSort(c, k))} /></th>
               <th><SortableHeader label="Nguyên giá" sortKey="NguyenGia" sortConfig={sortCfg} onSort={(k) => setSortCfg((c) => getNextSort(c, k))} /></th>
               <th>TG sử dụng</th>
               <th><SortableHeader label="KH Tháng" sortKey="GiaTriKhauHaoThang" sortConfig={sortCfg} onSort={(k) => setSortCfg((c) => getNextSort(c, k))} /></th>
@@ -233,7 +235,7 @@ function MonthlyTab() {
           <tbody>
             {rows.length === 0 ? (
               <tr className="empty-row">
-                <td colSpan={8}>Không có dữ liệu cho tháng {filter.thang}/{filter.nam}</td>
+                <td colSpan={10}>Không có dữ liệu cho tháng {filter.thang}/{filter.nam}</td>
               </tr>
             ) : (
               rows.map((item) => (
@@ -241,6 +243,7 @@ function MonthlyTab() {
                   <td style={{ fontWeight: 600 }}>TB{String(item.MaTB).padStart(3, "0")}</td>
                   <td>{item.TenThietBi}</td>
                   <td>{item.NgayMua ? new Date(item.NgayMua).toLocaleDateString("vi-VN") : "-"}</td>
+                  <td>{item.NgayCapDauTien ? new Date(item.NgayCapDauTien).toLocaleDateString("vi-VN") : "-"}</td>
                   <td className="num">{fmtVND(item.NguyenGia)}</td>
                   <td>
                     <div className="life-input-wrap">
