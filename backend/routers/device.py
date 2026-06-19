@@ -72,76 +72,16 @@ def get_device_detail(matb):
 @token_and_role_required(allowed_roles=["ADMIN"])
 def add_device():
     """Tạo thiết bị mới và tự động tạo cấu hình khấu hao từ danh mục."""
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
     try:
         data = request.json or {}
         if not data.get("TenThietBi") or not data.get("LoaiThietBi"):
             return jsonify({"message": "Tên và loại thiết bị không được để trống."}), 400
 
-        ten_danh_muc = str(data["LoaiThietBi"]).strip()
-
-        
-        cursor.execute(
-            "SELECT ID_DM, ThoiGianKhauHao FROM DANHMUCSANPHAM WHERE TenDanhMuc = %s AND TrangThai = 'HoatDong'",
-            (ten_danh_muc,)
-        )
-        dm_row = cursor.fetchone()
-        id_dm = dm_row["ID_DM"] if dm_row else None
-        
-        thoi_gian = int(dm_row["ThoiGianKhauHao"]) if (dm_row and dm_row["ThoiGianKhauHao"]) else 5
-
-        
-        nguyen_gia = data.get("GiaTri") or data.get("NguyenGia") or 0
-        ma_dot     = str(data.get("MaDot") or "").strip() or None
-        seri       = str(data.get("SeriNumber") or "").strip() or None
-
-        from models.devices import normalize_status_for_db
-        trang_thai = normalize_status_for_db(data.get("TrangThai", "SanSang"))
-
-        
-        cursor.execute("SELECT COALESCE(MAX(ID_TB), 0) + 1 FROM THIETBI")
-        device_id = cursor.fetchone()["COALESCE(MAX(ID_TB), 0) + 1"]
-
-        cursor.execute(
-            """
-            INSERT INTO THIETBI (ID_TB, TenThietBi, Loai, ID_DM, SeriNumber, NgayMua, NguyenGia, TrangThai, MaDot)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (
-                device_id,
-                data["TenThietBi"],
-                ten_danh_muc,
-                id_dm,
-                seri,
-                data.get("NgayMua") or None,
-                nguyen_gia,
-                trang_thai,
-                ma_dot,
-            ),
-        )
-
-        
-        cursor.execute(
-            """
-            INSERT INTO KHAUHAO (ID_TB, PhuongPhapTinh, ThoiGianSuDung, GiaTriThuHoi, GiaTriBanDau)
-            VALUES (%s, 'straight-line', %s, 0, %s)
-            ON DUPLICATE KEY UPDATE
-                ThoiGianSuDung = VALUES(ThoiGianSuDung),
-                GiaTriBanDau   = VALUES(GiaTriBanDau)
-            """,
-            (device_id, thoi_gian, nguyen_gia),
-        )
-
-        conn.commit()
+        device_id = create_device(data)
         return jsonify({"message": "Thêm thiết bị thành công.", "ID_TB": device_id}), 201
     except Exception as e:
-        conn.rollback()
         print(f"Lỗi tạo thiết bị: {e}")
         return jsonify({"message": f"Lỗi hệ thống: {str(e)}"}), 500
-    finally:
-        cursor.close()
-        conn.close()
         
         
 @device_bp.route("/update/<int:matb>", methods=["PUT"])

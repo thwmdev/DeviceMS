@@ -11,9 +11,9 @@ import "../index.css";
 import "../App.css";
 import "../styles/inventory.css";
 
-const DEVICE_API_URL = "http://127.0.0.1:5000/api/device";
-const CATEGORY_API_URL = "http://127.0.0.1:5000/api/product-category";
-const INVENTORY_API_URL = "http://127.0.0.1:5000/api/inventory";
+const DEVICE_API_URL = "https://devicems-hd3z.onrender.com/api/device";
+const CATEGORY_API_URL = "https://devicems-hd3z.onrender.com/api/product-category";
+const INVENTORY_API_URL = "https://devicems-hd3z.onrender.com/api/inventory";
 
 const EMPTY_DEVICE_ROW = {
   TenThietBi: "",
@@ -42,19 +42,89 @@ const formatDateInput = (value) => {
     const dd = String(value.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   }
-  return String(value).trim();
+  if (typeof value === "number") {
+    const excelDate = XLSX.SSF.parse_date_code(value);
+    if (excelDate) {
+      const yyyy = excelDate.y;
+      const mm = String(excelDate.m).padStart(2, "0");
+      const dd = String(excelDate.d).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+  }
+  const strVal = String(value).trim();
+  const vnDate = strVal.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (vnDate) {
+    const [, day, month, year] = vnDate;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  const parsedDate = new Date(strVal);
+  if (!Number.isNaN(parsedDate.getTime())) {
+    const yyyy = parsedDate.getFullYear();
+    const mm = String(parsedDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(parsedDate.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return strVal;
 };
 
 const normalizeMoney = (value) => {
   if (value === null || value === undefined || value === "") return "";
-  let text = String(value).trim();
-  if (text.includes(".") && text.includes(",")) {
+  if (typeof value === "number") return Math.round(value);
+
+  let text = String(value).trim().replace(/\s/g, "").replace(/[^\d.,-]/g, "");
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(text)) {
     text = text.replace(/\./g, "").replace(/,/g, ".");
-  } else if (text.includes(",")) {
+  } else if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(text)) {
     text = text.replace(/,/g, "");
+  } else if (text.includes(",") && !text.includes(".")) {
+    text = text.replace(/,/g, ".");
   }
   const parsed = Number.parseFloat(text);
   return Number.isNaN(parsed) ? "" : Math.round(parsed);
+};
+
+const normalizeExcelHeader = (value) =>
+  String(value ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+const EXCEL_HEADERS = {
+  TenThietBi: ["Tên thiết bị", "tenthietbi"],
+  LoaiThietBi: ["Loại thiết bị", "loaithietbi"],
+  SoLuong: ["Số lượng", "soluong"],
+  SeriNumber: ["Số Seri", "serinumber"],
+  NgayMua: ["Ngày mua", "ngaymua"],
+  GiaTri: ["Giá trị", "giatri", "nguyengia"],
+};
+
+const normalizeExcelRow = (row) => {
+  const normalized = {};
+  Object.entries(row).forEach(([key, value]) => {
+    const normalizedKey = normalizeExcelHeader(key);
+    if (normalizedKey) {
+      normalized[normalizedKey] = value;
+    }
+  });
+  return normalized;
+};
+
+const getExcelValue = (row, aliases, fallback = "") => {
+  for (const alias of aliases) {
+    if (row[alias] !== undefined && row[alias] !== null && row[alias] !== "") {
+      return row[alias];
+    }
+  }
+  return fallback;
+};
+
+const parseImportQuantity = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 };
 
 export default function Inventory() {
@@ -394,7 +464,19 @@ export default function Inventory() {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: "array", cellDates: true });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet);
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      const rows = rawRows.map((rawRow) => {
+        const row = normalizeExcelRow(rawRow);
+        return {
+          ...row,
+          TenThietBi: getExcelValue(row, EXCEL_HEADERS.TenThietBi),
+          LoaiThietBi: getExcelValue(row, EXCEL_HEADERS.LoaiThietBi),
+          SoLuong: getExcelValue(row, EXCEL_HEADERS.SoLuong, 1),
+          SeriNumber: getExcelValue(row, EXCEL_HEADERS.SeriNumber),
+          NgayMua: getExcelValue(row, EXCEL_HEADERS.NgayMua),
+          GiaTri: getExcelValue(row, EXCEL_HEADERS.GiaTri, 0),
+        };
+      });
 
       if (rows.length === 0) {
         toast.warning("File Excel không có dữ liệu.");
@@ -403,31 +485,44 @@ export default function Inventory() {
         return;
       }
 
+      const importableRows = rows.filter((row) => row.TenThietBi && row.LoaiThietBi);
+      if (importableRows.length === 0) {
+        toast.warning("File Excel khong co dong hop le. Can co cot TenThietBi va LoaiThietBi.");
+        return;
+      }
+
       const excelBatchId = generateBatchId();
       let successCount = 0;
       let totalToImport = 0;
 
-      for (const row of rows) {
-        if (!row.TenThietBi || !row.LoaiThietBi) continue;
+      for (const row of importableRows) {
+        const tenTB = row.TenThietBi || row["Tên thiết bị"] || row["Tên Thiết Bị"] || row["Tên thiêt bị"] || "";
+        const loaiTB = row.LoaiThietBi || row["Loại thiết bị"] || row["Loại Thiết Bị"] || "";
+
+        if (!tenTB || !loaiTB) continue;
 
         const rawQty = row.SoLuong ?? row["Số lượng"] ?? row.soluong ?? 1;
-        const qty = parseInt(rawQty) || 1;
+        const qty = parseImportQuantity(rawQty);
         totalToImport += qty;
 
         for (let i = 0; i < qty; i++) {
-          let seri = row.SeriNumber ? String(row.SeriNumber).trim() : "";
+          const rawSeri = row.SeriNumber || row["Seri Number"] || row["Số seri"] || row["Seri"] || "";
+          let seri = String(rawSeri).trim();
           if (qty > 1 && seri) {
             seri = `${seri}-${i + 1}`;
           }
+          const rawNgayMua = row.NgayMua || row["Ngày mua"] || row["Ngày Mua"];
+          const rawGiaTri = row.GiaTri || row["Giá trị"] || row["Giá Trị"] || row["Giá"] || 0;
+
           try {
             await axios.post(
               `${DEVICE_API_URL}/create`,
               {
-                TenThietBi: String(row.TenThietBi).trim(),
-                LoaiThietBi: String(row.LoaiThietBi).trim(),
+                TenThietBi: String(tenTB).trim(),
+                LoaiThietBi: String(loaiTB).trim(),
                 SeriNumber: seri || null,
-                NgayMua: formatDateInput(row.NgayMua),
-                GiaTri: normalizeMoney(row.GiaTri),
+                NgayMua: formatDateInput(rawNgayMua),
+                GiaTri: normalizeMoney(rawGiaTri),
                 TrangThai: "SAN_SANG",
                 MaDot: excelBatchId,
               },
