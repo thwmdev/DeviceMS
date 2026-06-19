@@ -9,6 +9,10 @@ import { getRoleLabel } from "../utils/roles";
 import { useConfirm } from "../components/confirmContext";
 import { toast } from "react-toastify";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "/api");
+const ACCOUNT_API_URL = `${API_BASE_URL}/account`;
+
 const Accounts = () => {
   const confirm = useConfirm();
   const [accounts, setAccounts] = useState([]);
@@ -21,7 +25,7 @@ const Accounts = () => {
 
   const fetchAccounts = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:5000/api/account/list", {
+      const res = await axios.get(`${ACCOUNT_API_URL}/list`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       setAccounts(res.data);
@@ -32,7 +36,7 @@ const Accounts = () => {
 
   const handleToggle = async (id) => {
     try {
-      await axios.put(`http://127.0.0.1:5000/api/account/toggle-status/${id}`, {}, {
+      await axios.put(`${ACCOUNT_API_URL}/toggle-status/${id}`, {}, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       await fetchAccounts();
@@ -64,7 +68,7 @@ const Accounts = () => {
     if (!accepted) return;
 
     try {
-      await axios.put(`http://127.0.0.1:5000/api/account/reset-password/${acc.ID_TK}`,
+      await axios.put(`${ACCOUNT_API_URL}/reset-password/${acc.ID_TK}`,
         {},
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );

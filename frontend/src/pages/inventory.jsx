@@ -11,9 +11,11 @@ import "../index.css";
 import "../App.css";
 import "../styles/inventory.css";
 
-const DEVICE_API_URL = "https://devicems-hd3z.onrender.com/api/device";
-const CATEGORY_API_URL = "https://devicems-hd3z.onrender.com/api/product-category";
-const INVENTORY_API_URL = "https://devicems-hd3z.onrender.com/api/inventory";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "/api");
+const DEVICE_API_URL = `${API_BASE_URL}/device`;
+const CATEGORY_API_URL = `${API_BASE_URL}/product-category`;
+const INVENTORY_API_URL = `${API_BASE_URL}/inventory`;
 
 const EMPTY_DEVICE_ROW = {
   TenThietBi: "",

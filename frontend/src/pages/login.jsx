@@ -4,6 +4,10 @@ import axios from "axios";
 import "../App.css";
 import { getCanonicalStoredRole, getRoleFromAuthResponse, isEmployeeRole } from "../utils/roles";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "/api");
+const AUTH_API_URL = `${API_BASE_URL}/auth`;
+
 const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +26,7 @@ const Login = () => {
     }
     setLoading(true);
     try {
-      const response = await axios.post("http://127.0.0.1:5000/api/auth/login", {
+      const response = await axios.post(`${AUTH_API_URL}/login`, {
         username: username, 
         password: password,
       });

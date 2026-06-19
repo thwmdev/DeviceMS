@@ -3,6 +3,10 @@ import axios from "axios";
 import { getCanonicalStoredRole } from "../utils/roles";
 import { toast } from "react-toastify";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "/api");
+const ACCOUNT_API_URL = `${API_BASE_URL}/account`;
+
 const AccountModal = ({ onClose, refresh, accountData }) => {
   const isEdit = !!accountData;
   const initialRole = getCanonicalStoredRole(
@@ -82,7 +86,7 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
         };
 
         await axios.put(
-          `http://127.0.0.1:5000/api/account/update/${accountData.ID_TK}`,
+          `${ACCOUNT_API_URL}/update/${accountData.ID_TK}`,
           updateData,
           config
         );
@@ -90,7 +94,7 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
         toast.success("Cập nhật thành công!");
       } else {
         await axios.post(
-          "http://127.0.0.1:5000/api/account/create",
+          `${ACCOUNT_API_URL}/create`,
           formData,
           config
         );

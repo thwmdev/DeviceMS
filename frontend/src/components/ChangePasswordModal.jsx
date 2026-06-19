@@ -2,7 +2,9 @@ import { useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-const API = "http://127.0.0.1:5000/api/account";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "/api");
+const API = `${API_BASE_URL}/account`;
 const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
 const EyeIcon = () => (

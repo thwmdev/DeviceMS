@@ -11,7 +11,10 @@ import "../styles/depre.css";
 import { toast } from "react-toastify";
 import { useConfirm } from "../components/confirmContext";
 
-const API = "http://127.0.0.1:5000/api/depreciation";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "/api");
+const API = `${API_BASE_URL}/depreciation`;
+const DEVICE_API = `${API_BASE_URL}/device`;
 const fmtVND = (v) => Number(v || 0).toLocaleString("vi-VN") + " đ";
 
 function getHeaders() {
@@ -100,7 +103,7 @@ function MonthlyTab() {
     setSavingId(maTB);
     try {
       const res = await axios.put(
-        `http://127.0.0.1:5000/api/device/update-life/${maTB}`,
+        `${DEVICE_API}/update-life/${maTB}`,
         { ThoiGianSuDung: Number(newVal), reset_history: resetHistory },
         { headers: getHeaders() }
       );

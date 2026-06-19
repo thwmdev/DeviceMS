@@ -9,7 +9,9 @@ import { getNextSort, sortRows } from "../utils/tableSort";
 import { useConfirm } from "../components/confirmContext";
 import { toast } from "react-toastify";
 
-const API_URL = "http://127.0.0.1:5000/api/product-category";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "/api");
+const API_URL = `${API_BASE_URL}/product-category`;
 
 const EMPTY_ROW = {
   MaDanhMuc: "",

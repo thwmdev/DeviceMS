@@ -5,8 +5,10 @@ import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, L
 import "../App.css";
 import Sidebar from "../components/sidebar";
 
-const API_URL = "http://127.0.0.1:5000/api/device";
-const ALLOCATION_API_URL = "http://127.0.0.1:5000/api/allocation-request";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "/api");
+const API_URL = `${API_BASE_URL}/device`;
+const ALLOCATION_API_URL = `${API_BASE_URL}/allocation-request`;
 
 const STATUS_LABEL = {
   SAN_SANG: "Sẵn sàng",
