@@ -1,0 +1,70 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  color-scheme: light;
+  font-family:
+    "Aptos",
+    "Geist",
+    "Plus Jakarta Sans",
+    "Segoe UI Variable",
+    "Segoe UI",
+    sans-serif;
+  background: #f4f1eb;
+  color: #1d2528;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(159, 125, 82, 0.13), transparent 30rem),
+    radial-gradient(circle at 100% 12%, rgba(59, 87, 87, 0.10), transparent 32rem),
+    #f4f1eb;
+  color: #1d2528;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  pointer-events: none;
+  opacity: 0.045;
+  background-image:
+    linear-gradient(rgba(29, 37, 40, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29, 37, 40, 0.18) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  color: #fbfaf7;
+  background: #315a58;
+}
