@@ -21,7 +21,7 @@ const Accounts = () => {
 
   const fetchAccounts = async () => {
     try {
-      const res = await axios.get("https://devicems-hd3z.onrender.com/api/account/list", {
+      const res = await axios.get("http://127.0.0.1:5000/api/account/list", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       setAccounts(res.data);
@@ -32,7 +32,7 @@ const Accounts = () => {
 
   const handleToggle = async (id) => {
     try {
-      await axios.put(`https://devicems-hd3z.onrender.com/api/account/toggle-status/${id}`, {}, {
+      await axios.put(`http://127.0.0.1:5000/api/account/toggle-status/${id}`, {}, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       await fetchAccounts();
@@ -64,7 +64,7 @@ const Accounts = () => {
     if (!accepted) return;
 
     try {
-      await axios.put(`https://devicems-hd3z.onrender.com/api/account/reset-password/${acc.ID_TK}`,
+      await axios.put(`http://127.0.0.1:5000/api/account/reset-password/${acc.ID_TK}`,
         {},
         { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
       );

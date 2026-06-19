@@ -2,7 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-const API = "https://devicems-hd3z.onrender.com/api/account";
+const API = "http://127.0.0.1:5000/api/account";
 const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
 const EyeIcon = () => (

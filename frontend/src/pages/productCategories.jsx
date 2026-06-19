@@ -9,7 +9,7 @@ import { getNextSort, sortRows } from "../utils/tableSort";
 import { useConfirm } from "../components/confirmContext";
 import { toast } from "react-toastify";
 
-const API_URL = "https://devicems-hd3z.onrender.com/api/product-category";
+const API_URL = "http://127.0.0.1:5000/api/product-category";
 
 const EMPTY_ROW = {
   MaDanhMuc: "",

@@ -82,7 +82,7 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
         };
 
         await axios.put(
-          `https://devicems-hd3z.onrender.com/api/account/update/${accountData.ID_TK}`,
+          `http://127.0.0.1:5000/api/account/update/${accountData.ID_TK}`,
           updateData,
           config
         );
@@ -90,7 +90,7 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
         toast.success("Cập nhật thành công!");
       } else {
         await axios.post(
-          "https://devicems-hd3z.onrender.com/api/account/create",
+          "http://127.0.0.1:5000/api/account/create",
           formData,
           config
         );

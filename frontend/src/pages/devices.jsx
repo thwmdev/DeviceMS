@@ -10,7 +10,7 @@ import { getNextSort, sortRows } from "../utils/tableSort";
 import { toast } from "react-toastify";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
-  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "https://devicems-hd3z.onrender.com/api");
+  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "http://127.0.0.1:5000/api");
 const API_URL = `${API_BASE_URL}/device`;
 const CATEGORY_API_URL = `${API_BASE_URL}/product-category`;
 const INVENTORY_API_URL = `${API_BASE_URL}/inventory`;

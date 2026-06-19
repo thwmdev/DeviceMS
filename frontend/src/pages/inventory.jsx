@@ -11,9 +11,9 @@ import "../index.css";
 import "../App.css";
 import "../styles/inventory.css";
 
-const DEVICE_API_URL = "https://devicems-hd3z.onrender.com/api/device";
-const CATEGORY_API_URL = "https://devicems-hd3z.onrender.com/api/product-category";
-const INVENTORY_API_URL = "https://devicems-hd3z.onrender.com/api/inventory";
+const DEVICE_API_URL = "http://127.0.0.1:5000/api/device";
+const CATEGORY_API_URL = "http://127.0.0.1:5000/api/product-category";
+const INVENTORY_API_URL = "http://127.0.0.1:5000/api/inventory";
 
 const EMPTY_DEVICE_ROW = {
   TenThietBi: "",

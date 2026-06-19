@@ -8,7 +8,7 @@ import Pagination from "../components/Pagination";
 import { getNextSort, sortRows } from "../utils/tableSort";
 import { toast } from "react-toastify";
 
-const API_URL = "https://devicems-hd3z.onrender.com/api/allocation-request";
+const API_URL = "http://127.0.0.1:5000/api/allocation-request";
 
 const REQUEST_TYPE_LABEL = {
   CAP_PHAT: "Cấp phát",

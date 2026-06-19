@@ -5,8 +5,8 @@ import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, L
 import "../App.css";
 import Sidebar from "../components/sidebar";
 
-const API_URL = "https://devicems-hd3z.onrender.com/api/device";
-const ALLOCATION_API_URL = "https://devicems-hd3z.onrender.com/api/allocation-request";
+const API_URL = "http://127.0.0.1:5000/api/device";
+const ALLOCATION_API_URL = "http://127.0.0.1:5000/api/allocation-request";
 
 const STATUS_LABEL = {
   SAN_SANG: "Sẵn sàng",
