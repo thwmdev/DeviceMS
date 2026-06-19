@@ -6,9 +6,6 @@ from dateutil.relativedelta import relativedelta
 
 import datetime 
 
-
-
-
 def save_depreciation(data):
 
     conn = None
@@ -98,10 +95,11 @@ def caculate_depre(thang=None, nam=None):
 
     try:
         now = datetime.datetime.now()
-        for item in danh_sach:
-            if (nam > now.year) or (nam == now.year and thang > now.month):
-                
-                continue
+        if (nam > now.year) or (nam == now.year and thang > now.month):
+            return {
+                "status": "skipped",
+                "message": "Không thể tính khấu hao cho tháng trong tương lai"
+            }
 
         start_month = date(nam, thang, 1)
         end_month = date(nam, thang, calendar.monthrange(nam, thang)[1])
@@ -134,13 +132,7 @@ def caculate_depre(thang=None, nam=None):
             phuong_phap = item["PhuongPhapTinh"]
 
             ngay_ket_thuc = item["NgayKetThuc"]
-
-
-            if item["TrangThai"] in ("DA_CAP_PHAT", "DaCapPhat", "DangSuDung", "DANG_SU_DUNG"):
-                if not ngay_bat_dau:
-                    ngay_bat_dau = date.today()
-
-            
+                       
             ngay_cap_dau = item.get("NgayCapDauTien")
             ngay_bat_dau_db = item.get("NgayBatDau")
 

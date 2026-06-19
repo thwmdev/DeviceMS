@@ -264,7 +264,6 @@ def get_device_by_id(matb):
 
 
 def create_device(data):
-    """Tạo thiết bị mới, gán ID_DM và tự tạo bản ghi KHAUHAO từ danh mục."""
     _ensure_device_columns()
     conn = None
     cursor = None
@@ -366,8 +365,7 @@ def update_device(matb, data):
                 ID_DM = %s,
                 SeriNumber = %s,
                 NgayMua = %s,
-                NguyenGia = %s,
-                TrangThai = %s
+                NguyenGia = %s
             WHERE ID_TB = %s
             """,
             (
@@ -377,7 +375,6 @@ def update_device(matb, data):
                 seri,
                 data.get("NgayMua") or None,
                 nguyen_gia if nguyen_gia != "" else None,
-                normalize_status_for_db(data.get("TrangThai")),
                 matb,
             ),
         )

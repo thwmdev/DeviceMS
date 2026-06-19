@@ -80,26 +80,50 @@ export default function Devices() {
     }
   }, [navigate]);
 
+
   const loadDevices = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        limit: "10000",
-        search,
-      });
+
+      const params = new URLSearchParams();
+
+      params.set("page", currentPage);
+      params.set("limit", itemsPerPage);
+
+      if (search) params.set("search", search);
       if (batchFilter) params.set("batch_id", batchFilter);
+      if (categoryFilter) params.set("category", categoryFilter);
+      if (statusFilter) params.set("status", statusFilter);
+
+      params.set("sortBy", sortConfig.key);
+      params.set("order", sortConfig.direction);
+
       const res = await axios.get(`${API_URL}/list?${params.toString()}`, {
         headers: authHeader(),
       });
+
       setDevices(res.data.data || []);
       setTotal(res.data.total || 0);
     } catch (err) {
       handleAuthError(err);
-      toast.error(err?.response?.data?.message || "Không tải được danh sách thiết bị.");
+      toast.error(
+        err?.response?.data?.message || "Không tải được danh sách thiết bị."
+      );
     } finally {
       setLoading(false);
     }
-  }, [authHeader, handleAuthError, search, batchFilter]);
+  }, [
+    authHeader,
+    handleAuthError,
+    currentPage,
+    itemsPerPage,
+    search,
+    batchFilter,
+    categoryFilter,
+    statusFilter,
+    sortConfig,
+  ]);
+
 
   const loadBatches = useCallback(async () => {
     try {
@@ -166,39 +190,13 @@ export default function Devices() {
 
   useEffect(() => { loadDevices(); }, [loadDevices]);
 
-  const tableRows = useMemo(() => {
-    let result = devices.map((device) => ({
-      ...device,
-      TrangThaiText: STATUS_LABEL[device.TrangThai] || device.TrangThai,
-    }));
-    if (search) {
-      const lowerSearch = search.toLowerCase();
-      result = result.filter(d => 
-        (d.MaThietBi || "").toLowerCase().includes(lowerSearch) ||
-        (d.TenThietBi || "").toLowerCase().includes(lowerSearch) ||
-        (d.SeriNumber || "").toLowerCase().includes(lowerSearch) ||
-        (d.LoaiThietBi || "").toLowerCase().includes(lowerSearch)
-      );
-    }
-    if (categoryFilter) {
-      result = result.filter(d => d.LoaiThietBi === categoryFilter);
-    }
-    if (statusFilter) {
-      result = result.filter(d => d.TrangThai === statusFilter);
-    }
-    return result;
-  }, [devices, search, categoryFilter, statusFilter]);
 
-  const sortedDevices = useMemo(
-    () => sortRows(tableRows, sortConfig),
-    [tableRows, sortConfig],
-  );
+  const totalPages = Math.ceil(total / itemsPerPage) || 1;
+  const currentDevices = devices;
 
-  const totalPages = Math.ceil(sortedDevices.length / itemsPerPage) || 1;
-  const currentDevices = sortedDevices.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, batchFilter, categoryFilter, statusFilter, sortConfig]);
 
   
   const handleOpenEditModal = (device) => {
