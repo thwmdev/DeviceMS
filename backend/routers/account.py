@@ -12,9 +12,14 @@ account_bp = Blueprint("account", __name__)
 
 
 @account_bp.route("/list", methods=["GET"])
-@token_and_role_required(allowed_roles=["ADMIN"]) 
+@token_and_role_required(allowed_roles=["ADMIN"])
 def get_accounts():
-    return jsonify(get_all_accounts())
+    data = get_all_accounts()
+
+    print("DEBUG DATA:")
+    print(data)
+
+    return jsonify(data)
 
 @account_bp.route("/create", methods=["POST"])
 @token_and_role_required(allowed_roles=["ADMIN"]) 
@@ -34,7 +39,7 @@ def create_account():
             return jsonify({"message": str(val_err)}), 400
     except Exception as e:
         print(e)
-        return jsonify({"message": "Có lỗi hệ thống xảy ra!"}), 500
+        return jsonify({"message": "Đã tồn tại tài khoản có tên đăng nhập này!"}), 500
 
 @account_bp.route("/update/<int:matk>", methods=["PUT"])
 @token_and_role_required(allowed_roles=["ADMIN"])

@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { getCanonicalStoredRole } from "../utils/roles";
 import { toast } from "react-toastify";
-
 
 const AccountModal = ({ onClose, refresh, accountData }) => {
   const isEdit = !!accountData; 
@@ -16,51 +15,88 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
       VaiTro: initialRole 
     });
 
+  const isEdit = !!accountData;
+
+  const [formData, setFormData] = useState({
+    HoTen: "",
+    PhongBan: "",
+    ChucVu: "NHANVIEN",
+    TenDangNhap: "",
+    Email: "",
+    MatKhau: "",
+    VaiTro: "NHANVIEN",
+  });
+
+ 
+  useEffect(() => {
+    if (accountData) {
+      setFormData({
+        HoTen: accountData.HoTen || "",
+        PhongBan: accountData.PhongBan || "",
+        ChucVu: accountData.ChucVu || "",
+        TenDangNhap: accountData.TenDangNhap || "",
+        Email: accountData.Email || "",
+        MatKhau: "",
+        VaiTro: accountData.VaiTro || "NHANVIEN",
+      });
+    }
+  }, [accountData]);
 
 
 
-  const handleRoleChange = (selectedRole) => {
-    let autoDepartment = "Marketing"; 
-    let autoPosition = "NHANVIEN";
+  const handleRoleChange = (role) => {
+    let phongBan = "";
+    let chucVu = "";
 
-    if (selectedRole === "ADMIN") {
-      autoDepartment = "IT";
-      autoPosition = "ADMIN";
-    } else if (selectedRole === "HR") {
-      autoDepartment = "HR";
-      autoPosition = "HR";
-    } else if (selectedRole === "NHANVIEN") {
-      autoDepartment = "Marketing";
-      autoPosition = "NHANVIEN";
+    if (role === "ADMIN") {
+      phongBan = "IT";
+      chucVu = "ADMIN";
+    } else if (role === "HR") {
+      phongBan = "HR";
+      chucVu = "HR";
+    } else {
+      phongBan = "Marketing";
+      chucVu = "NHANVIEN";
     }
 
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      VaiTro: selectedRole,
-      PhongBan: autoDepartment,
-      ChucVu: autoPosition
+      VaiTro: role,
+      PhongBan: phongBan,
+      ChucVu: chucVu,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     
     
     if (!formData.HoTen || !formData.TenDangNhap) {
       toast.warning("Vui lòng điền đủ thông tin!");
+
+
+    if (!formData.HoTen || !formData.TenDangNhap) {
+      alert("Thiếu thông tin!");
       return;
     }
 
     try {
-      const config = { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } };
-      
+      const config = {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      };
+
       if (isEdit) {
+        
         const updateData = {
           HoTen: formData.HoTen,
           VaiTro: formData.VaiTro,
           PhongBan: formData.PhongBan,
-          ChucVu: formData.ChucVu
+          ChucVu: formData.ChucVu,
         };
+<<<<<<< Updated upstream
         
         if (!updateData.MatKhau) {
           delete updateData.MatKhau;
@@ -72,55 +108,86 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
 
         
         await axios.post("https://devicems-hd3z.onrender.com/api/account/create", formData, config);
+
+
+        await axios.put(
+          `https://devicems-hd3z.onrender.com/api/account/update/${accountData.ID_TK}`,
+          updateData,
+          config
+        );
+
+        alert("Cập nhật thành công!");
+      } else {
+        await axios.post(
+          "https://devicems-hd3z.onrender.com/api/account/create",
+          formData,
+          config
+        );
+
       }
-      
-      refresh(); 
-      onClose(); 
+
+      refresh();
+      onClose();
     } catch (err) {
+
       console.error(err);
       toast.error(err.response?.data?.message || "Lỗi khi xử lý tài khoản");
+
+      alert(err.response?.data?.message || "Lỗi server");
+
     }
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <form className="modal-content" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
-        <h3>{isEdit ? "Cập nhật tài khoản" : "Thêm tài khoản mới"}</h3>
-        <label>Họ Tên:</label>
-        <input className="form-field" placeholder="Họ và tên" value={formData.HoTen} onChange={(e) => setFormData({...formData, HoTen: e.target.value})} required/>
-        
-            
-        <label>Vai Trò:</label>
-        <select 
-            className="form-field" 
-            value={formData.VaiTro} 
-            onChange={(e) => handleRoleChange(e.target.value)} 
-            required
-        >
-            <option value="ADMIN">Admin</option>
-            <option value="HR">HR</option>
-            <option value="NHANVIEN">Nhân viên</option>
+      <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+        <h3>{isEdit ? "Cập nhật tài khoản" : "Thêm tài khoản"}</h3>
+
+        <input
+          value={formData.HoTen}
+          onChange={(e) => setFormData({ ...formData, HoTen: e.target.value })}
+          placeholder="Họ tên"
+        />
+
+
+        <input
+          value={formData.TenDangNhap}
+          placeholder="Username"
+          onChange={(e) => {
+            const username = e.target.value.toLowerCase().replace(/\s+/g, "");
+
+            setFormData((prev) => ({
+              ...prev,
+              TenDangNhap: username,
+              Email: username ? `${username}@company.com` : "",
+            }));
+          }}
+          disabled={isEdit}
+        />
+
+
+        <input value={formData.Email} disabled />
+        <select value={formData.VaiTro} onChange={(e) => handleRoleChange(e.target.value)}>
+          <option value="ADMIN">ADMIN</option>
+          <option value="HR">HR</option>
+          <option value="NHANVIEN">NHANVIEN</option>
         </select>
-        <label>Phòng ban:</label>
-        <input 
-          className="form-field" 
-          value={formData.PhongBan} 
-          readOnly 
-          style={{ backgroundColor: "#e9ecef", cursor: "not-allowed" }}
-        />
 
-        <label>Tên đăng nhập:</label>
-        <input className="form-field" placeholder="Tên đăng nhập" value={formData.TenDangNhap} 
-          readOnly 
-          style={{ backgroundColor: "#e9ecef", cursor: "not-allowed" }}
-        />
+       
+        <input value={formData.PhongBan} disabled />
 
-        {!isEdit && <input className="form-field" type="password" placeholder="Mật khẩu" onChange={(e) => setFormData({...formData, MatKhau: e.target.value})} required />}
+        {!isEdit && (
+          <input
+            type="password"
+            placeholder="Mật khẩu"
+            onChange={(e) => setFormData({ ...formData, MatKhau: e.target.value })}
+          />
+        )}
 
-        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-          <button type="submit" className="btn-primary">{isEdit ? "Cập nhật" : "Lưu"}</button>
-          <button type="button" onClick={onClose} className="btn-secondary">Hủy</button>
-        </div>
+        <button type="submit">{isEdit ? "Cập nhật" : "Tạo mới"}</button>
+        <button type="button" onClick={onClose}>
+          Hủy
+        </button>
       </form>
     </div>
   );

@@ -385,7 +385,7 @@ function DeviceTab() {
       {!selected ? (
         <div className="empty-state">
           <div className="empty-state-icon"></div>
-          <div>Hãy chọn một thiết bị để xem lịch sử khấu hao</div>
+          <div>Chọn một thiết bị để xem lịch sử khấu hao</div>
         </div>
       ) : (
         <>
@@ -415,7 +415,10 @@ function DeviceTab() {
             </div>
           )}
 
-          {}
+
+  
+
+
           <div className="chart-card" style={{ marginTop: "16px" }}>
             <h3>Biểu đồ hao mòn — {selectedInfo?.TenThietBi}</h3>
             {loading ? (
@@ -427,7 +430,8 @@ function DeviceTab() {
             )}
           </div>
 
-          {}
+
+
           <div className="depre-table-wrap" style={{ marginTop: "16px" }}>
             <table className="depre-table">
               <thead>
@@ -444,7 +448,7 @@ function DeviceTab() {
                     <td colSpan={4}>Chưa có lịch sử tính khấu hao cho thiết bị này</td>
                   </tr>
                 ) : (
-                  
+
                   [...history].reverse().map((h, idx) => (
                     <tr key={idx}>
                       <td style={{ fontWeight: 600 }}>

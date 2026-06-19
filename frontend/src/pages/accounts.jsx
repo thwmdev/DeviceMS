@@ -22,6 +22,7 @@ const Accounts = () => {
       const res = await axios.get("https://devicems-hd3z.onrender.com/api/account/list", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
+        console.log("API RESPONSE:", res.data);
       setAccounts(res.data);
     } catch (err) {
       toast.error("Lỗi: " + (err.response?.data?.message || "Không thể tải danh sách tài khoản"));
@@ -45,8 +46,8 @@ const Accounts = () => {
 
 
   const handleEdit = (account) => {
-      const cleanAccount = { ...account, ID_TK: Number(String(account.ID_TK).split(':')[0]) };
-      setEditingAccount(cleanAccount);
+      console.log("EDIT ACCOUNT =", account);
+      setEditingAccount(account);
       setIsModalOpen(true);
   };
 
