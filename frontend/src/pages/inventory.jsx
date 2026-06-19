@@ -373,7 +373,7 @@ export default function Inventory() {
           }
         }
       }
-      alert(`Đã nhập kho thành công ${successCount}/${totalToImport} thiết bị (Mã đợt: ${importBatchId}).`);
+      toast.success(`Đã nhập kho thành công ${successCount}/${totalToImport} thiết bị (Mã đợt: ${importBatchId}).`);
       setOpenImportModal(false);
       handleTabChange("batches");
     } catch (err) {
@@ -397,7 +397,9 @@ export default function Inventory() {
       const rows = XLSX.utils.sheet_to_json(sheet);
 
       if (rows.length === 0) {
-        alert("File Excel không có dữ liệu.");
+        toast.warning("File Excel không có dữ liệu.");
+        setLoading(false);
+        event.target.value = "";
         return;
       }
 
@@ -437,12 +439,12 @@ export default function Inventory() {
           }
         }
       }
-      alert(`Import thành công ${successCount}/${totalToImport} thiết bị từ file Excel (Mã đợt: ${excelBatchId}).`);
+      toast.success(`Import thành công ${successCount}/${totalToImport} thiết bị từ file Excel (Mã đợt: ${excelBatchId}).`);
       setOpenImportModal(false);
       handleTabChange("batches");
     } catch (err) {
       console.error(err);
-      alert("Đọc và import file Excel thất bại.");
+      toast.error("Đọc và import file Excel thất bại.");
     } finally {
       event.target.value = "";
       setLoading(false);
@@ -529,7 +531,7 @@ export default function Inventory() {
       setBatchDevices(res.data.data || []);
     } catch (err) {
       console.error(err);
-      alert("Không tải được chi tiết đợt nhập.");
+      toast.error("Không tải được chi tiết đợt nhập.");
     } finally {
       setLoadingBatchDevices(false);
     }
