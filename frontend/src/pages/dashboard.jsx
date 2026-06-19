@@ -119,12 +119,6 @@ const Dashboard = () => {
 
   const recentDevices = devices.slice(0, 5);
 
-  const role = (localStorage.getItem("role") || "").toUpperCase();
-  const isAdmin = role === "ADMIN";
-  const isManager = role === "MANAGER";
-  const isHR = role === "HR";
-  
-
   return (
     <div className="page-container">
       <Sidebar />

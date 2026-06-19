@@ -2,6 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 
 import "../App.css";
+import { getCanonicalStoredRole, getRoleFromAuthResponse, isEmployeeRole } from "../utils/roles";
 
 const Login = () => {
   const [username, setUsername] = useState("");
@@ -30,17 +31,19 @@ const Login = () => {
 
 
       if (response.data && response.data.token) {
+        const role = getRoleFromAuthResponse(response.data);
+        const storedRole = getCanonicalStoredRole(role);
 
         // Luuw laij token vaf role vaof localStorage
         localStorage.setItem("token", response.data.token);
-        if (response.data.role) {
-          localStorage.setItem("role", response.data.role);
+        if (storedRole) {
+          localStorage.setItem("role", storedRole);
         } else {
           localStorage.removeItem("role");
         }
         localStorage.setItem("username", response.data.username || username);
 
-        window.location.href = "/dashboard"; 
+        window.location.href = isEmployeeRole(role) ? "/devices" : "/dashboard"; 
       }
     } catch (err) {
       if (err.response) {

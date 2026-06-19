@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+import traceback
 from database.db import get_connection
 from models.devices import (
     get_devices_paginated,
@@ -15,7 +16,7 @@ device_bp = Blueprint("device", __name__)
 
 
 
-VIEW_ROLES = ["ADMIN", "HR", "USER"]
+VIEW_ROLES = ["ADMIN", "HR", "NHANVIEN"]
 
 
 @device_bp.route("/list", methods=["GET"])
@@ -32,7 +33,7 @@ def get_devices():
         claims = getattr(request, "user_claims", {}) or {}
         user_role = claims.get("role", "").upper()
         employee_id = None
-        if user_role == "USER":
+        if user_role == "NHANVIEN":
             raw_id = claims.get("employee_id") or claims.get("id_nv")
             if raw_id:
                 try:
@@ -163,7 +164,9 @@ def edit_device(matb):
     except ValueError as e:
         return jsonify({"message": str(e)}), 400
     except Exception as e:
-        return jsonify({"message": "Có lỗi hệ thống xảy ra."}), 500
+        print(f"Loi cap nhat thiet bi {matb}: {e}")
+        traceback.print_exc()
+        return jsonify({"message": f"Co loi he thong xay ra: {str(e)}"}), 500
 
 
 @device_bp.route("/delete/<int:matb>", methods=["DELETE"])

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import Sidebar from "../components/sidebar";
@@ -9,6 +9,7 @@ import Pagination from "../components/Pagination";
 import { getNextSort, sortRows } from "../utils/tableSort";
 import "../styles/depre.css";
 import { toast } from "react-toastify";
+import { useConfirm } from "../components/confirmContext";
 
 const API = "https://devicems-hd3z.onrender.com/api/depreciation";
 const fmtVND = (v) => Number(v || 0).toLocaleString("vi-VN") + " đ";
@@ -19,6 +20,7 @@ function getHeaders() {
 
 
 function MonthlyTab() {
+  const confirm = useConfirm();
   const now = new Date();
   const [filter, setFilter] = useState({ thang: now.getMonth() + 1, nam: now.getFullYear() });
   const [report, setReport]       = useState([]);
@@ -85,11 +87,15 @@ function MonthlyTab() {
     if (Number(newVal) === Number(curVal) || !newVal || newVal <= 0) return;
 
     
-    const resetHistory = window.confirm(
-      `Bạn có muốn XÓA lịch sử khấu hao cũ của thiết bị #${maTB} và tính lại từ đầu?\n` +
-      `• Chọn OK  → Xóa lịch sử cũ, tính lại từ tháng đầu tiên.\n` +
-      `• Chọn Hủy → Giữ lịch sử cũ, áp dụng thời gian mới từ tháng tiếp theo.`
-    );
+    const resetHistory = await confirm({
+      tone: "warning",
+      eyebrow: "Khấu hao",
+      title: "Cập nhật thời gian sử dụng",
+      message: `Bạn có muốn xóa lịch sử khấu hao cũ của thiết bị #${maTB} và tính lại từ đầu?`,
+      details: "Chọn xác nhận để xóa lịch sử cũ và tính lại từ tháng đầu tiên. Chọn giữ lịch sử để áp dụng thời gian mới từ tháng tiếp theo.",
+      confirmText: "Xóa và tính lại",
+      cancelText: "Giữ lịch sử",
+    });
 
     setSavingId(maTB);
     try {

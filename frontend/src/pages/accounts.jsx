@@ -4,8 +4,12 @@ import Sidebar from "../components/sidebar";
 import AccountModal from "../components/accM";
 import Pagination from "../components/Pagination";
 import "../styles/acc.css";
+import { getRoleLabel } from "../utils/roles";
+import { useConfirm } from "../components/confirmContext";
+import { toast } from "react-toastify";
 
 const Accounts = () => {
+  const confirm = useConfirm();
   const [accounts, setAccounts] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
@@ -20,7 +24,7 @@ const Accounts = () => {
       });
       setAccounts(res.data);
     } catch (err) {
-      alert("Lỗi: " + (err.response?.data?.message || "Không thể tải danh sách tài khoản"));
+      toast.error("Lỗi: " + (err.response?.data?.message || "Không thể tải danh sách tài khoản"));
     }
   };
 
@@ -33,7 +37,7 @@ const Accounts = () => {
       });
       await fetchAccounts();
     } catch (err) {
-      alert("Lỗi: " + (err.response?.data?.message || "Không thể cập nhật trạng thái"));
+      toast.error("Lỗi: " + (err.response?.data?.message || "Không thể cập nhật trạng thái"));
     }
   };
 
@@ -53,8 +57,16 @@ const Accounts = () => {
   };
 
   const handleResetPassword = async (acc) => {
-  
-  if (!window.confirm(`Bạn có chắc chắn muốn reset mật khẩu của ${acc.TenDangNhap} về 123456?`)) {
+  const accepted = await confirm({
+    tone: "danger",
+    eyebrow: "Tài khoản",
+    title: "Reset mật khẩu",
+    message: `Reset mật khẩu của ${acc.TenDangNhap} về mật khẩu mặc định 123456?`,
+    details: "Người dùng nên đổi mật khẩu sau khi đăng nhập lại.",
+    confirmText: "Reset mật khẩu",
+    cancelText: "Hủy",
+  });
+  if (!accepted) {
     return;
   }
 
@@ -64,9 +76,9 @@ const Accounts = () => {
       {}, // Gửi rỗng vì mật khẩu đã được xử lý ở server
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
     );
-    alert("Reset mật khẩu thành công!");
+    toast.success("Reset mật khẩu thành công!");
   } catch (err) {
-    alert("Lỗi: " + (err.response?.data?.message || "Không thể reset mật khẩu"));
+    toast.error("Lỗi: " + (err.response?.data?.message || "Không thể reset mật khẩu"));
   }
 };
 
@@ -115,7 +127,7 @@ const Accounts = () => {
             {Array.isArray(accounts) && currentAccounts.map(acc => (
               <tr key={acc.ID_TK}>
                 <td>{acc.TenDangNhap}</td>
-                <td>{acc.VaiTro}</td>
+                <td>{getRoleLabel(acc.VaiTro)}</td>
                 <td>
                   <span className={`status-badge ${acc.TrangThai === 'HoatDong' ? 'active' : 'locked'}`}>
                     {acc.TrangThai}

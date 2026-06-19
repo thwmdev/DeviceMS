@@ -8,18 +8,23 @@ import Dashboard from "./pages/dashboard";
 import ProductCategories from "./pages/productCategories";
 import Accounts from "./pages/accounts";
 import Depreciation from "./pages/depreciation";
+import { getStoredRole, isEmployeeRole } from "./utils/roles";
+import { ConfirmProvider } from "./components/ConfirmDialog";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 
 function ProtectedDashboard() {
-  const role = (localStorage.getItem("role") || "").toUpperCase();
-  if (role === "USER") return <Navigate to="/devices" replace />;
+  const role = getStoredRole();
+  if (isEmployeeRole(role)) return <Navigate to="/devices" replace />;
   return <Dashboard />;
 }
 
 function App() {
   return (
     <Router>
-      <Routes>
+      <ConfirmProvider>
+        <Routes>
 
 
         <Route path="/" element={<Navigate to="/login" replace />} />
@@ -36,7 +41,23 @@ function App() {
 
 
 
-      </Routes>
+        </Routes>
+        <ToastContainer
+          className="app-toast-container"
+          toastClassName="app-toast"
+          bodyClassName="app-toast-body"
+          progressClassName="app-toast-progress"
+          position="top-right"
+          autoClose={3200}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
+      </ConfirmProvider>
     </Router>
   );
 }

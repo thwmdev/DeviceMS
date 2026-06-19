@@ -1,16 +1,19 @@
 import { useState } from "react";
 import axios from "axios";
+import { getCanonicalStoredRole } from "../utils/roles";
+import { toast } from "react-toastify";
 
 
 const AccountModal = ({ onClose, refresh, accountData }) => {
   const isEdit = !!accountData; 
+  const initialRole = getCanonicalStoredRole(accountData?.VaiTro || "NHANVIEN");
   const [formData, setFormData] = useState({ 
       HoTen: accountData?.HoTen || "", 
       PhongBan: accountData?.PhongBan || "IT", 
       ChucVu: accountData?.ChucVu || "NHANVIEN", 
       TenDangNhap: accountData?.TenDangNhap || "", 
       MatKhau: "",
-      VaiTro: accountData?.VaiTro || "NHANVIEN" 
+      VaiTro: initialRole 
     });
 
 
@@ -44,7 +47,7 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
     
     // Kiểm tra dữ liệu
     if (!formData.HoTen || !formData.TenDangNhap) {
-      alert("Vui lòng điền đủ thông tin!");
+      toast.warning("Vui lòng điền đủ thông tin!");
       return;
     }
 
@@ -75,7 +78,7 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
       onClose(); 
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || "Lỗi khi xử lý tài khoản");
+      toast.error(err.response?.data?.message || "Lỗi khi xử lý tài khoản");
     }
   };
 

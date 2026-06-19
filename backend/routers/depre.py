@@ -123,7 +123,7 @@ def cleanup_and_recalc():
         conn.close()
 
 @depre_bp.route("/detail/<ma_tb>", methods=["GET"])
-@token_and_role_required(allowed_roles=["ADMIN", "HR", "USER"])
+@token_and_role_required(allowed_roles=["ADMIN", "HR", "NHANVIEN"])
 def get_depreciation_config(ma_tb):
     config = get_depreciation_detail(ma_tb)
     if not config:
@@ -227,7 +227,7 @@ def get_chart_data():
 
 
 @depre_bp.route("/devices", methods=["GET"])
-@token_and_role_required(allowed_roles=["ADMIN", "HR", "USER"])
+@token_and_role_required(allowed_roles=["ADMIN", "HR", "NHANVIEN"])
 def get_depre_devices():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -246,7 +246,7 @@ def get_depre_devices():
 
 # ─── Lịch sử khấu hao 1 thiết bị theo tháng (tab 2) ─────────────────────────
 @depre_bp.route("/history/<int:ma_tb>", methods=["GET"])
-@token_and_role_required(allowed_roles=["ADMIN", "HR", "USER"])
+@token_and_role_required(allowed_roles=["ADMIN", "HR", "NHANVIEN"])
 def get_depreciation_history(ma_tb):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)

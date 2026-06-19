@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import * as XLSX from "xlsx";
@@ -84,6 +85,7 @@ export default function Inventory() {
   const [searchDisposeBatch, setSearchDisposeBatch] = useState("");
   const [searchHistory, setSearchHistory] = useState("");
   const [searchDisposeModal, setSearchDisposeModal] = useState("");
+  const [historyTypeFilter, setHistoryTypeFilter] = useState("");
 
   // New states for missing table features
   const [currentPageBatchDetail, setCurrentPageBatchDetail] = useState(1);
@@ -109,7 +111,7 @@ export default function Inventory() {
 
   const [openDisposeModal, setOpenDisposeModal] = useState(false);
   const [disposeBatchId, setDisposeBatchId] = useState("");
-  const [disposeQuantities, setDisposeQuantities] = useState({});
+  const [selectedDisposeIds, setSelectedDisposeIds] = useState(new Set());
   const [disposeError, setDisposeError] = useState("");
 
   // Batch Detail Modal
@@ -269,16 +271,21 @@ export default function Inventory() {
   const filteredHistory = useMemo(() => {
     if (!history) return [];
     let list = history;
+    if (historyTypeFilter) {
+      list = list.filter(h => h.type === historyTypeFilter);
+    }
     if (searchHistory) {
       const lowerSearch = searchHistory.toLowerCase();
       list = list.filter(h => 
-        (h.action || "").toLowerCase().includes(lowerSearch) ||
-        (h.performer || "").toLowerCase().includes(lowerSearch) ||
-        (h.details || "").toLowerCase().includes(lowerSearch)
+        (h.description || "").toLowerCase().includes(lowerSearch) ||
+        (h.name || "").toLowerCase().includes(lowerSearch) ||
+        (String(h.deviceId || "")).toLowerCase().includes(lowerSearch) ||
+        (h.seri || "").toLowerCase().includes(lowerSearch) ||
+        (String(h.batchId || "")).toLowerCase().includes(lowerSearch)
       );
     }
     return sortRows(list, sortHistory);
-  }, [history, searchHistory, sortHistory]);
+  }, [history, searchHistory, historyTypeFilter, sortHistory]);
   
   const totalHistoryPages = Math.ceil(filteredHistory.length / itemsPerPage) || 1;
   const currentHistory = filteredHistory.slice((currentPageHistory - 1) * itemsPerPage, currentPageHistory * itemsPerPage);
@@ -447,80 +454,62 @@ export default function Inventory() {
     setLoading(true);
     await loadAvailableDevices();
     setDisposeBatchId(`TL_${generateBatchId()}`);
-    setDisposeQuantities({});
+    setSelectedDisposeIds(new Set());
     setDisposeError("");
     setSearchDisposeModal("");
     setOpenDisposeModal(true);
     setLoading(false);
   };
 
-  const groupedDevices = useMemo(() => {
-    const map = {};
-    availableDevices.forEach(dev => {
-      const key = `${dev.TenThietBi}|${dev.LoaiThietBi}`;
-      if (!map[key]) {
-        map[key] = {
-          key,
-          TenThietBi: dev.TenThietBi,
-          LoaiThietBi: dev.LoaiThietBi,
-          GiaTri: dev.GiaTri,
-          availableCount: 0,
-          devices: []
-        };
-      }
-      map[key].availableCount++;
-      map[key].devices.push(dev);
-    });
-    return Object.values(map);
-  }, [availableDevices]);
-
-  // Filtered grouped devices in disposal modal
-  const filteredGroupedDevices = useMemo(() => {
-    return groupedDevices.filter(g => 
-      g.TenThietBi.toLowerCase().includes(searchDisposeModal.toLowerCase()) ||
-      g.LoaiThietBi.toLowerCase().includes(searchDisposeModal.toLowerCase())
+  // Filtered individual devices in disposal modal
+  const filteredDisposeDevices = useMemo(() => {
+    const q = searchDisposeModal.toLowerCase();
+    if (!q) return availableDevices;
+    return availableDevices.filter(dev =>
+      (dev.TenThietBi || "").toLowerCase().includes(q) ||
+      (dev.LoaiThietBi || "").toLowerCase().includes(q) ||
+      (dev.SeriNumber || "").toLowerCase().includes(q) ||
+      (String(dev.MaTB || "")).toLowerCase().includes(q)
     );
-  }, [groupedDevices, searchDisposeModal]);
+  }, [availableDevices, searchDisposeModal]);
 
-  const handleQuantityChange = (key, val, max) => {
-    let num = parseInt(val) || 0;
-    if (num < 0) num = 0;
-    if (num > max) num = max;
-    setDisposeQuantities(prev => ({ ...prev, [key]: num }));
+  const toggleDisposeSelect = (id) => {
+    setSelectedDisposeIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllDispose = () => {
+    if (selectedDisposeIds.size === filteredDisposeDevices.length) {
+      setSelectedDisposeIds(new Set());
+    } else {
+      setSelectedDisposeIds(new Set(filteredDisposeDevices.map(d => d.MaTB)));
+    }
   };
 
   const handleDispose = async () => {
-    let targetIds = [];
-    for (const [key, qty] of Object.entries(disposeQuantities)) {
-      if (qty > 0) {
-        const group = groupedDevices.find(g => g.key === key);
-        if (group) {
-          targetIds.push(...group.devices.slice(0, qty).map(d => d.MaTB));
-        }
-      }
-    }
-
+    const targetIds = [...selectedDisposeIds];
     if (targetIds.length === 0) {
-      setDisposeError("Vui lòng nhập số lượng thanh lý lớn hơn 0 cho ít nhất một loại thiết bị.");
+      setDisposeError("Vui lòng chọn ít nhất một thiết bị để thanh lý.");
       return;
     }
-
-    if (!window.confirm(`Bạn có chắc chắn muốn thanh lý tổng cộng ${targetIds.length} thiết bị trực tiếp từ kho không?`)) {
-      return;
-    }
-
     try {
       setLoading(true);
       await axios.post(`${DEVICE_API_URL}/dispose-batch`, {
         deviceIds: targetIds,
         batchId: disposeBatchId
       }, { headers: authHeader() });
-      alert(`Thanh lý thành công ${targetIds.length} thiết bị.`);
+      toast.success(`Thanh lý thành công ${targetIds.length} thiết bị.`);
       setOpenDisposeModal(false);
       handleTabChange("dispose_batches");
     } catch (err) {
       handleAuthError(err);
-      setDisposeError(err?.response?.data?.message || "Thanh lý thiết bị thất bại.");
+      const msg = err?.response?.data?.message || "Thanh lý thiết bị thất bại.";
+      setDisposeError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -921,6 +910,39 @@ export default function Inventory() {
         {/* Tab 3: Detailed History timeline */}
         {activeTab === "history" && (
           <div className="timeline-list">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "var(--card-bg, #ffffff)", padding: "12px 16px", borderRadius: "10px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+              <h2 style={{ fontSize: "16px", fontWeight: "760", color: "var(--accent)", margin: 0 }}>
+                Nhật ký hoạt động
+              </h2>
+              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                <select
+                  className="search-input"
+                  value={historyTypeFilter}
+                  onChange={(e) => {
+                    setHistoryTypeFilter(e.target.value);
+                    setCurrentPageHistory(1);
+                  }}
+                  style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px", width: "180px", outline: "none", cursor: "pointer", background: "var(--bg, #fcfcfc)", color: "var(--ink)" }}
+                >
+                  <option value="">Tất cả trạng thái</option>
+                  <option value="IMPORT">Nhập kho</option>
+                  <option value="ALLOCATE">Xuất kho</option>
+                  <option value="RETURN">Thu hồi</option>
+                  <option value="DISPOSE">Thanh lý</option>
+                </select>
+                <input
+                  type="text"
+                  className="search-input"
+                  placeholder="Tìm kiếm nhật ký..."
+                  value={searchHistory}
+                  onChange={(e) => {
+                    setSearchHistory(e.target.value);
+                    setCurrentPageHistory(1);
+                  }}
+                  style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px", width: "300px", outline: "none", background: "var(--bg, #fcfcfc)", color: "var(--ink)" }}
+                />
+              </div>
+            </div>
             {loading ? (
               <p>Đang tải nhật ký kho...</p>
             ) : currentHistory.length === 0 ? (
@@ -1140,78 +1162,85 @@ export default function Inventory() {
 
               <div className="device-modal-body">
                 {disposeError && <div className="form-error modal-error">{disposeError}</div>}
-                
+
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                   <p style={{ margin: 0, color: "var(--ink-soft)", fontSize: "14px" }}>
-                    Chọn các thiết bị đang sẵn sàng trong kho bên dưới để thanh lý.
+                    Chọn từng thiết bị sẵn sàng trong kho để đưa vào đợt thanh lý.
                   </p>
                   <input
                     type="text"
                     className="search-input"
-                    placeholder="Tìm thiết bị cần thanh lý..."
+                    placeholder="Tìm theo tên, loại, seri..."
                     value={searchDisposeModal}
                     onChange={(e) => setSearchDisposeModal(e.target.value)}
-                    style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px", width: "250px" }}
+                    style={{ padding: "8px 12px", border: "1px solid var(--border)", borderRadius: "6px", width: "260px" }}
                   />
                 </div>
 
-                <div style={{ overflowX: "auto", maxHeight: "400px" }}>
+                <div style={{ overflowX: "auto", maxHeight: "420px" }}>
                   <table className="device-table batch-input-table">
                     <thead>
                       <tr>
+                        <th style={{ width: "36px", textAlign: "center" }}>
+                          <input
+                            type="checkbox"
+                            title="Chọn tất cả"
+                            checked={filteredDisposeDevices.length > 0 && selectedDisposeIds.size === filteredDisposeDevices.length}
+                            onChange={toggleSelectAllDispose}
+                          />
+                        </th>
+                        <th>Mã TB</th>
                         <th>Tên thiết bị</th>
                         <th>Loại</th>
+                        <th>Số Seri</th>
                         <th>Nguyên giá (₫)</th>
-                        <th style={{ textAlign: "center" }}>Sẵn sàng trong kho</th>
-                        <th style={{ width: "120px", textAlign: "center" }}>SL Thanh lý</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredGroupedDevices.length === 0 ? (
+                      {filteredDisposeDevices.length === 0 ? (
                         <tr>
-                          <td colSpan="5" style={{ textAlign: "center" }}>Không tìm thấy thiết bị nào.</td>
+                          <td colSpan="6" style={{ textAlign: "center", padding: "24px 0", color: "var(--ink-soft)" }}>Không tìm thấy thiết bị nào.</td>
                         </tr>
                       ) : (
-                        filteredGroupedDevices.map((group) => (
-                          <tr key={group.key}>
-                            <td><strong>{group.TenThietBi}</strong></td>
-                            <td>{group.LoaiThietBi}</td>
-                            <td>{group.GiaTri !== null ? group.GiaTri.toLocaleString("vi-VN") : "-"}</td>
+                        filteredDisposeDevices.map((dev) => (
+                          <tr
+                            key={dev.MaTB}
+                            onClick={() => toggleDisposeSelect(dev.MaTB)}
+                            style={{ cursor: "pointer", background: selectedDisposeIds.has(dev.MaTB) ? "var(--accent-soft, #fce4e4)" : undefined }}
+                          >
                             <td style={{ textAlign: "center" }}>
-                              <span className="status-badge status-SAN_SANG">{group.availableCount}</span>
-                            </td>
-                            <td style={{ textAlign: "center" }}>
-                              <input 
-                                type="number" 
-                                min="0" 
-                                max={group.availableCount}
-                                style={{ width: "80px", textAlign: "center", padding: "4px" }}
-                                value={disposeQuantities[group.key] || ""}
-                                onChange={(e) => handleQuantityChange(group.key, e.target.value, group.availableCount)}
+                              <input
+                                type="checkbox"
+                                checked={selectedDisposeIds.has(dev.MaTB)}
+                                onChange={() => toggleDisposeSelect(dev.MaTB)}
+                                onClick={(e) => e.stopPropagation()}
                               />
                             </td>
+                            <td><code>#{dev.MaTB}</code></td>
+                            <td><strong>{dev.TenThietBi}</strong></td>
+                            <td>{dev.LoaiThietBi}</td>
+                            <td>{dev.SeriNumber || <span style={{ color: "var(--ink-soft)" }}>—</span>}</td>
+                            <td>{dev.GiaTri != null ? Number(dev.GiaTri).toLocaleString("vi-VN") : "—"}</td>
                           </tr>
                         ))
                       )}
                     </tbody>
                   </table>
                 </div>
-                <div style={{ marginTop: "12px", fontSize: "14px" }}>
-                  Tổng cộng: <strong>
-                    {Object.values(disposeQuantities).reduce((a, b) => a + (parseInt(b) || 0), 0)}
-                  </strong> thiết bị sẽ được thanh lý.
+                <div style={{ marginTop: "12px", fontSize: "14px", color: "var(--ink-soft)" }}>
+                  Đã chọn: <strong style={{ color: selectedDisposeIds.size > 0 ? "var(--danger)" : undefined }}>{selectedDisposeIds.size}</strong> / {availableDevices.length} thiết bị để thanh lý.
                 </div>
               </div>
 
               <div className="device-modal-footer">
                 <button className="btn-cancel" onClick={() => setOpenDisposeModal(false)} disabled={loading}>Hủy</button>
-                <button 
-                  className="btn-save" 
-                  onClick={handleDispose} 
-                  disabled={loading || Object.values(disposeQuantities).reduce((a, b) => a + (parseInt(b) || 0), 0) === 0} 
+                <button
+                  className="btn-save"
+                  onClick={handleDispose}
+                  disabled={loading || selectedDisposeIds.size === 0}
                   style={{ background: "var(--danger)" }}
                 >
-                  {loading ? "Đang xử lý..." : "Xác nhận thanh lý"}
+                  {loading ? "Đang xử lý..." : `Xác nhận thanh lý (${selectedDisposeIds.size})`}
                 </button>
               </div>
             </div>

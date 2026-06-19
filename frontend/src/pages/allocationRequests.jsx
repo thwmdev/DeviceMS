@@ -6,6 +6,7 @@ import Sidebar from "../components/sidebar";
 import SortableHeader from "../components/SortableHeader";
 import Pagination from "../components/Pagination";
 import { getNextSort, sortRows } from "../utils/tableSort";
+import { toast } from "react-toastify";
 
 const API_URL = "https://devicems-hd3z.onrender.com/api/allocation-request";
 
@@ -48,7 +49,7 @@ const formatDate = (value) => {
   return date.toLocaleDateString("vi-VN");
 };
 
-const getRole = () => localStorage.getItem("role")?.toUpperCase() || "USER";
+const getRole = () => localStorage.getItem("role")?.toUpperCase() || "NHANVIEN";
 
 const generateBatchId = () => {
   const now = new Date();
@@ -76,7 +77,7 @@ export default function AllocationRequests() {
   const navigate = useNavigate();
   const role = getRole();
   const canApprove = role === "ADMIN";
-  const isUser = role === "USER";
+  const isUser = role === "NHANVIEN";
 
   const [requests, setRequests] = useState([]);
   const [options, setOptions] = useState({
@@ -145,7 +146,7 @@ export default function AllocationRequests() {
       setTotal(res.data.total || 0);
     } catch (err) {
       handleAuthError(err);
-      alert(err?.response?.data?.message || "Không tải được danh sách yêu cầu.");
+      toast.error(err?.response?.data?.message || "Không tải được danh sách yêu cầu.");
     } finally {
       setLoading(false);
     }
@@ -213,7 +214,7 @@ export default function AllocationRequests() {
     const newBatchId = generateBatchId();
     setBatchId(newBatchId);
 
-    // Sinh row đầu tiên — nếu USER thì tự điền ID_NV
+    // Sinh row dau tien - neu la NHANVIEN thi tu dien ID_NV
     const firstRow = { ...EMPTY_REQUEST_ROW };
     if (isUser) {
       const empId = getEmployeeIdFromToken();
@@ -279,9 +280,9 @@ export default function AllocationRequests() {
         }
       }
       if (errors.length > 0) {
-        alert(`Gửi ${successCount}/${validRows.length} yêu cầu.\nLỗi:\n${errors.join("\n")}`);
+        toast.warning(`Gửi ${successCount}/${validRows.length} yêu cầu. Có ${errors.length} dòng lỗi.`);
       } else {
-        alert(`Gửi thành công ${successCount}/${validRows.length} yêu cầu (đợt ${batchId}).`);
+        toast.success(`Gửi thành công ${successCount}/${validRows.length} yêu cầu (đợt ${batchId}).`);
       }
       setOpenCreateModal(false);
       await Promise.all([loadRequests(), loadOptions(), loadBatches()]);
@@ -519,7 +520,7 @@ export default function AllocationRequests() {
                             </select>
                           </td>
 
-                          {/* Nhân viên (disabled nếu USER) */}
+                          {/* Nhan vien bi khoa truong nhan vien */}
                           <td>
                             {row.LoaiYeuCau === "CAP_PHAT" ? (
                               <select

@@ -346,26 +346,52 @@ def update_device(matb, data):
 
         cursor = conn.cursor()
         seri = str(data.get("SeriNumber") or "").strip() or None
+        ten_danh_muc = str(data["LoaiThietBi"]).strip()
+        nguyen_gia = data.get("GiaTri")
+
+        cursor.execute(
+            "SELECT ID_DM FROM DANHMUCSANPHAM WHERE TenDanhMuc = %s LIMIT 1",
+            (ten_danh_muc,),
+        )
+        category = cursor.fetchone()
+        if not category:
+            raise ValueError("Loai thiet bi khong ton tai.")
+        id_dm = category[0]
 
         cursor.execute(
             f"""
             UPDATE {TABLE_NAME}
             SET TenThietBi = %s,
                 Loai = %s,
+                ID_DM = %s,
                 SeriNumber = %s,
                 NgayMua = %s,
                 NguyenGia = %s,
+                TrangThai = %s
             WHERE ID_TB = %s
             """,
             (
                 data["TenThietBi"],
-                data["LoaiThietBi"],
+                ten_danh_muc,
+                id_dm,
                 seri,
                 data.get("NgayMua") or None,
-                data.get("GiaTri") or None,
+                nguyen_gia if nguyen_gia != "" else None,
+                normalize_status_for_db(data.get("TrangThai")),
                 matb,
             ),
         )
+
+        if nguyen_gia != "":
+            cursor.execute(
+                """
+                UPDATE KHAUHAO
+                SET GiaTriBanDau = %s
+                WHERE ID_TB = %s
+                """,
+                (nguyen_gia, matb),
+            )
+
         conn.commit()
     except Exception:
         if conn:

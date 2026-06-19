@@ -6,6 +6,8 @@ import Sidebar from "../components/sidebar";
 import SortableHeader from "../components/SortableHeader";
 import Pagination from "../components/Pagination";
 import { getNextSort, sortRows } from "../utils/tableSort";
+import { useConfirm } from "../components/confirmContext";
+import { toast } from "react-toastify";
 
 const API_URL = "https://devicems-hd3z.onrender.com/api/product-category";
 
@@ -46,6 +48,7 @@ const generateBatchId = () => {
 
 export default function ProductCategories() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const canManageCategories = localStorage.getItem("role")?.toUpperCase() === "ADMIN";
 
   const [categories, setCategories] = useState([]);
@@ -101,7 +104,7 @@ export default function ProductCategories() {
       setTotal(res.data.total || 0);
     } catch (err) {
       handleAuthError(err);
-      alert(err?.response?.data?.message || "Không tải được danh sách danh mục.");
+      toast.error(err?.response?.data?.message || "Không tải được danh sách danh mục.");
     } finally {
       setLoading(false);
     }
@@ -201,9 +204,9 @@ export default function ProductCategories() {
         }
       }
       if (errors.length > 0) {
-        alert(`Thêm ${successCount}/${validRows.length} danh mục.\nLỗi:\n${errors.join("\n")}`);
+        toast.warning(`Thêm ${successCount}/${validRows.length} danh mục. Có ${errors.length} dòng lỗi.`);
       } else {
-        alert(`Thêm thành công ${successCount}/${validRows.length} danh mục (đợt ${batchId}).`);
+        toast.success(`Thêm thành công ${successCount}/${validRows.length} danh mục (đợt ${batchId}).`);
       }
       setOpenBatchModal(false);
       await Promise.all([loadCategories(), loadBatches()]);
@@ -243,7 +246,7 @@ export default function ProductCategories() {
     try {
       setLoading(true);
       await axios.put(`${API_URL}/update/${editingId}`, editForm, { headers: authHeader() });
-      alert("Cập nhật danh mục thành công.");
+      toast.success("Cập nhật danh mục thành công.");
       setOpenEditModal(false);
       await loadCategories();
     } catch (err) {
@@ -256,14 +259,23 @@ export default function ProductCategories() {
 
   const handleToggleStatus = async (category) => {
     const nextLabel = category.TrangThai === "HoatDong" ? "tạm dừng" : "kích hoạt";
-    if (!window.confirm(`Bạn muốn ${nextLabel} danh mục "${category.TenDanhMuc}"?`)) return;
+    const accepted = await confirm({
+      tone: category.TrangThai === "HoatDong" ? "warning" : "default",
+      eyebrow: "Danh mục",
+      title: "Cập nhật trạng thái danh mục",
+      message: `Bạn muốn ${nextLabel} danh mục "${category.TenDanhMuc}"?`,
+      confirmText: nextLabel === "tạm dừng" ? "Tạm dừng" : "Kích hoạt",
+      cancelText: "Hủy",
+    });
+    if (!accepted) return;
     try {
       setLoading(true);
       await axios.put(`${API_URL}/toggle-status/${category.ID_DM}`, {}, { headers: authHeader() });
+      toast.success("Cập nhật trạng thái danh mục thành công.");
       await loadCategories();
     } catch (err) {
       handleAuthError(err);
-      alert(err?.response?.data?.message || "Cập nhật trạng thái thất bại.");
+      toast.error(err?.response?.data?.message || "Cập nhật trạng thái thất bại.");
     } finally {
       setLoading(false);
     }

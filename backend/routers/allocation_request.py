@@ -14,9 +14,9 @@ allocation_request_bp = Blueprint("allocation_request", __name__)
 
 # Xem danh sách: tất cả role
 VIEW_ROLES = ["ADMIN", "HR", "NHANVIEN"]
-# Tạo yêu cầu cấp phát: USER, HR, ADMIN
+# Tao yeu cau cap phat: NHANVIEN, HR, ADMIN
 CREATE_CAP_PHAT_ROLES = ["ADMIN", "HR", "NHANVIEN"]
-# Tạo yêu cầu thu hồi: HR, ADMIN, USER (USER chỉ thu hồi thiết bị của chính mình)
+# Tao yeu cau thu hoi: NHANVIEN, HR, ADMIN
 CREATE_THU_HOI_ROLES = ["ADMIN", "HR", "NHANVIEN"]
 # Duyệt / từ chối: chỉ ADMIN
 APPROVE_ROLES = ["ADMIN"]
@@ -83,9 +83,9 @@ def allocation_options():
     try:
         claims = _current_user_claims()
         user_role = claims.get("role", "").upper()
-        # Nếu là USER thì chỉ lấy activeAssignments của chính họ
+        # Nhan vien chi thay activeAssignments cua chinh ho
         employee_id = None
-        if user_role == "USER":
+        if user_role == "NHANVIEN":
             raw_id = claims.get("employee_id") or claims.get("id_nv")
             if raw_id:
                 try:
@@ -106,7 +106,7 @@ def create_request():
         claims = _current_user_claims()
         user_role = claims.get("role", "").upper()
 
-        # USER chỉ được tạo yêu cầu cấp phát
+        # Tao yeu cau cap phat: NHANVIEN, HR, ADMIN
         if loai_yeu_cau == "THU_HOI" and user_role not in CREATE_THU_HOI_ROLES:
             return jsonify({"message": "Bạn không có quyền tạo yêu cầu thu hồi!"}), 403
 

@@ -7,9 +7,13 @@ import Sidebar from "../components/sidebar";
 import SortableHeader from "../components/SortableHeader";
 import Pagination from "../components/Pagination";
 import { getNextSort, sortRows } from "../utils/tableSort";
+import { toast } from "react-toastify";
 
-const API_URL = "https://devicems-hd3z.onrender.com/api/device";
-const CATEGORY_API_URL = "https://devicems-hd3z.onrender.com/api/product-category";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "https://devicems-hd3z.onrender.com/api");
+const API_URL = `${API_BASE_URL}/device`;
+const CATEGORY_API_URL = `${API_BASE_URL}/product-category`;
+const INVENTORY_API_URL = `${API_BASE_URL}/inventory`;
 
 const EMPTY_EDIT_FORM = {
   MaThietBi: "",
@@ -32,7 +36,7 @@ export default function Devices() {
 
   // Role
   const role = (localStorage.getItem("role") || "").toUpperCase();
-  const isUser = role === "USER";
+  const isUser = role === "NHANVIEN";
   const isHR = role === "HR";
   const isAdmin = role === "ADMIN";
 
@@ -91,7 +95,7 @@ export default function Devices() {
       setTotal(res.data.total || 0);
     } catch (err) {
       handleAuthError(err);
-      alert(err?.response?.data?.message || "Không tải được danh sách thiết bị.");
+      toast.error(err?.response?.data?.message || "Không tải được danh sách thiết bị.");
     } finally {
       setLoading(false);
     }
@@ -120,7 +124,7 @@ export default function Devices() {
   const loadMetrics = useCallback(async () => {
     if (isUser) return;
     try {
-      const res = await axios.get("https://devicems-hd3z.onrender.com/api/inventory/stats", {
+      const res = await axios.get(`${INVENTORY_API_URL}/stats`, {
         headers: authHeader(),
       });
       const data = res.data.stats?.categories || [];
@@ -238,7 +242,7 @@ export default function Devices() {
     try {
       setLoading(true);
       await axios.put(`${API_URL}/update/${editingId}`, editForm, { headers: authHeader() });
-      alert("Cập nhật thiết bị thành công.");
+      toast.success("Cập nhật thiết bị thành công.");
       setOpenEditModal(false);
       await Promise.all([loadDevices(), loadMetrics()]);
     } catch (err) {

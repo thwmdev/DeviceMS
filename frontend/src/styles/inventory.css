@@ -231,9 +231,74 @@
 
 /* Detail modal list styling */
 .batch-detail-list {
-  max-height: 350px;
+  max-height: 430px;
   overflow-y: auto;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: #fffdfa;
+  padding: 14px;
+}
+
+.batch-detail-tools {
+  position: sticky;
+  top: -14px;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(150px, auto) minmax(150px, auto) auto;
+  gap: 10px;
+  align-items: center;
+  margin: -14px -14px 14px;
+  padding: 14px;
+  background: rgba(255, 253, 250, .96);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 10px 24px rgba(39, 45, 42, .06);
+  backdrop-filter: blur(8px);
+}
+
+.batch-detail-search,
+.batch-detail-select {
+  width: 100%;
+  min-height: 42px;
+  color: var(--ink);
+  background: #fbfaf7;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+
+.batch-detail-search {
+  padding: 0 16px;
+}
+
+.batch-detail-select {
+  padding: 0 34px 0 13px;
+}
+
+.batch-detail-search:focus,
+.batch-detail-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(49, 90, 88, .10);
+}
+
+.batch-detail-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border: 1px solid rgba(49, 90, 88, .12);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .batch-detail-tools {
+    grid-template-columns: 1fr;
+  }
 }

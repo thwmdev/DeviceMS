@@ -1,13 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-
-const getRoleFromToken = (token) => {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.role;
-  } catch {
-    return null;
-  }
-};
+import { getCanonicalStoredRole, getRoleFromToken, getRoleLabel } from "../utils/roles";
 
 const getStoredUser = () => {
   const token = localStorage.getItem("token");
@@ -16,28 +8,29 @@ const getStoredUser = () => {
 
   if (!token) return null;
 
-  const role = storedRole && storedRole !== "undefined"
+  const rawRole = storedRole && storedRole !== "undefined"
     ? storedRole
     : getRoleFromToken(token);
+  const role = getCanonicalStoredRole(rawRole);
 
-  return { username: username || "User", role: role || "USER" };
+  return { username: username || "Nguoi dung", role };
 };
 
 const PERMISSIONS = {
   manageAccounts: (role) => {
-    const normalized = role?.toUpperCase();
-    return normalized === "ADMIN" || normalized === "MANAGER";
+    const normalized = getCanonicalStoredRole(role);
+    return normalized === "ADMIN";
   },
   viewProductCategories: (role) => {
-    const normalized = role?.toUpperCase();
+    const normalized = getCanonicalStoredRole(role);
     return normalized === "ADMIN" || normalized === "HR";
   },
   viewDashboard: (role) => {
-    const normalized = role?.toUpperCase();
+    const normalized = getCanonicalStoredRole(role);
     return normalized === "ADMIN" || normalized === "HR";
   },
   viewInventory: (role) => {
-    const normalized = role?.toUpperCase();
+    const normalized = getCanonicalStoredRole(role);
     return normalized === "ADMIN";
   },
 };
@@ -69,7 +62,9 @@ export default function Sidebar() {
           </div>
           <div className="profile-info">
             <span className="profile-name">{user.username}</span>
-            <span className="profile-role">{user.role}</span>
+            <span className="profile-role">
+              {getRoleLabel(user.role)}
+            </span>
           </div>
         </div>
       )}

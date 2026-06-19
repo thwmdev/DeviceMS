@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from database.db import get_connection
 from security.hash import verify_password, hash_password
 from security.jwthandler import encode_token
+from security.roles import normalize_role
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -57,16 +58,7 @@ def login():
 
     conn.close()
 
-    raw_role = user.get("VaiTro", "")
-    role_upper = raw_role.upper()
-    if "NHANVIEN" in role_upper or "NHÂN VIÊN" in role_upper or "NHAN VIEN" in role_upper or "USER" in role_upper:
-        mapped_role = "USER"
-    elif "ADMIN" in role_upper:
-        mapped_role = "ADMIN"
-    elif "HR" in role_upper:
-        mapped_role = "HR"
-    else:
-        mapped_role = raw_role
+    mapped_role = normalize_role(user.get("VaiTro", ""))
 
     payload = {
         "username": user["TenDangNhap"],
