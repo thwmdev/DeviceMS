@@ -53,7 +53,7 @@ const Accounts = () => {
   };
 
   const handleResetPassword = async (acc) => {
-  // Xác nhận trước khi reset
+  
   if (!window.confirm(`Bạn có chắc chắn muốn reset mật khẩu của ${acc.TenDangNhap} về 123456?`)) {
     return;
   }

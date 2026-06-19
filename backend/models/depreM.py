@@ -1,8 +1,9 @@
 from database.db import get_connection
 import datetime
+import calendar
 from datetime import date
-
-
+from dateutil.relativedelta import relativedelta
+import datetime 
 
 def save_depreciation(data):
 
@@ -34,8 +35,6 @@ def save_depreciation(data):
             raise ValueError("Giá trị thu hồi phải nhỏ hơn nguyên giá.")
 
         ngay_bat_dau = ngay_mua
-
-        # FIX chuẩn ERP (không cộng tay year nữa)
         ngay_ket_thuc = ngay_bat_dau + relativedelta(years=int(data["usefulLife"]))
 
         cursor.execute("""
@@ -52,10 +51,10 @@ def save_depreciation(data):
             ON DUPLICATE KEY UPDATE
                 PhuongPhapTinh = VALUES(PhuongPhapTinh),
                 ThoiGianSuDung = VALUES(ThoiGianSuDung),
-                GiaTriThuHoi   = VALUES(GiaTriThuHoi),
-                GiaTriBanDau   = VALUES(GiaTriBanDau),
-                NgayBatDau     = VALUES(NgayBatDau),
-                NgayKetThuc    = VALUES(NgayKetThuc)
+                GiaTriThuHoi = VALUES(GiaTriThuHoi),
+                GiaTriBanDau = VALUES(GiaTriBanDau),
+                NgayBatDau = VALUES(NgayBatDau),
+                NgayKetThuc = VALUES(NgayKetThuc)
         """, (
             data["MaTB"],
             data["method"],
@@ -75,7 +74,6 @@ def save_depreciation(data):
             conn.close()
 
 
-
 def caculate_depre(thang=None, nam=None):
 
     conn = get_connection()
@@ -83,11 +81,10 @@ def caculate_depre(thang=None, nam=None):
 
     try:
         now = datetime.datetime.now()
-
-        if thang is None:
-            thang = now.month
-        if nam is None:
-            nam = now.year
+        for item in danh_sach:
+            if (nam > now.year) or (nam == now.year and thang > now.month):
+                
+                continue
 
         start_month = date(nam, thang, 1)
         end_month = date(nam, thang, calendar.monthrange(nam, thang)[1])
@@ -96,6 +93,7 @@ def caculate_depre(thang=None, nam=None):
             SELECT
                 t.ID_TB,
                 t.NguyenGia,
+                t.TrangThai,
                 COALESCE(k.PhuongPhapTinh, 'straight-line') AS PhuongPhapTinh,
                 COALESCE(k.ThoiGianSuDung, 5) AS SoNam,
                 COALESCE(k.GiaTriThuHoi, 0) AS GiaTriThuHoi,
@@ -120,9 +118,9 @@ def caculate_depre(thang=None, nam=None):
             ngay_bat_dau = item["NgayBatDau"]
             ngay_ket_thuc = item["NgayKetThuc"]
 
-            # =========================
-            # 1. VALID TIME RANGE
-            # =========================
+            if item["TrangThai"] in ("DA_CAP_PHAT", "DaCapPhat", "DangSuDung", "DANG_SU_DUNG"):
+                if not ngay_bat_dau:
+                    ngay_bat_dau = date.today()
 
             if ngay_bat_dau and ngay_bat_dau > end_month:
                 continue
@@ -130,14 +128,9 @@ def caculate_depre(thang=None, nam=None):
             if ngay_ket_thuc and ngay_ket_thuc < start_month:
                 continue
 
-            # 👉 không cho chạy trước ngày mua
             if ngay_bat_dau:
                 if (nam < ngay_bat_dau.year) or (nam == ngay_bat_dau.year and thang < ngay_bat_dau.month):
                     continue
-
-            # =========================
-            # 2. AVOID DUPLICATE MONTH
-            # =========================
 
             cursor.execute("""
                 SELECT 1 FROM LICHSUKHAUHAO
@@ -146,10 +139,6 @@ def caculate_depre(thang=None, nam=None):
 
             if cursor.fetchone():
                 continue
-
-            # =========================
-            # 3. LŨY KẾ
-            # =========================
 
             cursor.execute("""
                 SELECT COALESCE(SUM(GiaTriKhauHaoThang), 0) AS LuyKe
@@ -166,10 +155,6 @@ def caculate_depre(thang=None, nam=None):
 
             so_thang = so_nam * 12
 
-            # =========================
-            # 4. DEPRECIATION METHOD
-            # =========================
-
             if phuong_phap == "declining-balance":
 
                 rate_year = 2 / so_nam
@@ -185,18 +170,10 @@ def caculate_depre(thang=None, nam=None):
             else:
                 khau_hao_thang = (nguyen_gia - gia_tri_thu_hoi) / so_thang
 
-            # =========================
-            # 5. FINAL SAFETY LIMIT
-            # =========================
-
             thuc_ghi = min(khau_hao_thang, gia_tri_con_lai - gia_tri_thu_hoi)
 
             new_luy_ke = luy_ke + thuc_ghi
             new_con_lai = nguyen_gia - new_luy_ke
-
-            # =========================
-            # 6. INSERT
-            # =========================
 
             cursor.execute("""
                 INSERT INTO LICHSUKHAUHAO
@@ -219,7 +196,8 @@ def caculate_depre(thang=None, nam=None):
     finally:
         cursor.close()
         conn.close()
-        
+
+
 def get_depreciation_detail(ma_tb):
     conn = None
     cursor = None
@@ -229,6 +207,7 @@ def get_depreciation_detail(ma_tb):
         cursor.execute("SELECT * FROM KHAUHAO WHERE ID_TB = %s", (ma_tb,))
         return cursor.fetchone()
     finally:
-        if cursor: cursor.close()
-        if conn: conn.close()
-
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()

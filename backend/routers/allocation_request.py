@@ -13,11 +13,11 @@ from security.roles import token_and_role_required
 allocation_request_bp = Blueprint("allocation_request", __name__)
 
 # Xem danh sách: tất cả role
-VIEW_ROLES = ["ADMIN", "HR", "USER"]
+VIEW_ROLES = ["ADMIN", "HR", "NHANVIEN"]
 # Tạo yêu cầu cấp phát: USER, HR, ADMIN
-CREATE_CAP_PHAT_ROLES = ["ADMIN", "HR", "USER"]
+CREATE_CAP_PHAT_ROLES = ["ADMIN", "HR", "NHANVIEN"]
 # Tạo yêu cầu thu hồi: HR, ADMIN, USER (USER chỉ thu hồi thiết bị của chính mình)
-CREATE_THU_HOI_ROLES = ["ADMIN", "HR", "USER"]
+CREATE_THU_HOI_ROLES = ["ADMIN", "HR", "NHANVIEN"]
 # Duyệt / từ chối: chỉ ADMIN
 APPROVE_ROLES = ["ADMIN"]
 
@@ -44,7 +44,7 @@ def list_allocation_requests():
         claims = getattr(request, "user_claims", {}) or {}
         user_role = claims.get("role", "").upper()
         employee_id = None
-        if user_role == "USER":
+        if user_role == "NHANVIEN":
             raw_id = claims.get("employee_id") or claims.get("id_nv")
             if raw_id:
                 try:

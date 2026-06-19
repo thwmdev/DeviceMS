@@ -457,10 +457,6 @@ function DeviceTab() {
     </>
   );
 }
-
-// ─────────────────────────────────────────────────────────────
-// MAIN PAGE
-// ─────────────────────────────────────────────────────────────
 export default function Depreciation() {
   const [tab, setTab] = useState("monthly");
 

@@ -22,7 +22,7 @@ def create_account():
     try:
         
         data = request.json
-        required_fields = ["TenDangNhap", "MatKhau", "VaiTro", "HoTen", "Email"] 
+        required_fields = ["TenDangNhap", "MatKhau", "VaiTro", "HoTen"] 
         if not all(field in data for field in required_fields):
             return jsonify({"message": "Thiếu thông tin bắt buộc!"}), 400
             

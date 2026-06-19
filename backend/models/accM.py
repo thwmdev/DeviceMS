@@ -7,7 +7,14 @@ def get_all_accounts():
     if not conn: return []
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT ID_TK, TenDangNhap, VaiTro, TrangThai FROM TAIKHOAN")
+        sql = """
+                SELECT 
+                    TK.ID_TK, TK.TenDangNhap, TK.VaiTro, TK.TrangThai,
+                    NV.HoTen, NV.PhongBan, NV.ChucVu, NV.Email
+                FROM TAIKHOAN TK
+                INNER JOIN NHANVIEN NV ON TK.ID_NV = NV.ID_NV
+                """
+        cursor.execute(sql)        
         return cursor.fetchall()
     finally:
         cursor.close()
@@ -16,19 +23,19 @@ def get_all_accounts():
 
 
 def create_account_db(data):
-    # Sử dụng .get() để an toàn hơn
+
     ho_ten = data.get("HoTen")
-    email = data.get("Email")
     ten_dn = data.get("TenDangNhap")
     mat_khau = data.get("MatKhau")
     
-    if not all([ho_ten, email, ten_dn, mat_khau]):
+    if not all([ho_ten, ten_dn, mat_khau]):
         raise Exception("Vui lòng điền đầy đủ các thông tin bắt buộc (Họ tên, Email, Tên đăng nhập, Mật khẩu)")
 
+    email = f"{ten_dn}@company.com"
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        #vào NHANVIEN
+        
         cursor.execute("INSERT INTO NHANVIEN (HoTen, Email, PhongBan, ChucVu) VALUES (%s, %s, %s, %s)", 
                        (ho_ten, email, data.get("PhongBan"), data.get("ChucVu")))
         
@@ -56,7 +63,7 @@ def create_account_db(data):
 def toggle_account_status_db(matk):
     """Vô hiệu hóa hoặc kích hoạt tài khoản."""
     conn = get_connection()
-    # PHẢI THÊM dictionary=True ĐỂ LẤY KẾT QUẢ DẠNG DICTIONARY
+
     cursor = conn.cursor(dictionary=True) 
     try:
         cursor.execute("SELECT TrangThai FROM TAIKHOAN WHERE ID_TK = %s", (matk,))
@@ -95,8 +102,35 @@ def update_account_db(matk, data):
             params.append(matk)
             sql = f"UPDATE TAIKHOAN SET {', '.join(updates)} WHERE ID_TK = %s"
             cursor.execute(sql, tuple(params))
-            conn.commit()
             
+            cursor.execute("SELECT ID_NV FROM TAIKHOAN WHERE ID_TK = %s", (matk,))
+        
+        res = cursor.fetchone()
+        
+        if res:
+            id_nv = res["ID_NV"] if isinstance(res, dict) else res[0]
+            
+            updates_nv = []
+            params_nv = []
+            
+            if data.get("HoTen"):
+                updates_nv.append("HoTen = %s")
+                params_nv.append(data["HoTen"])
+                
+            if data.get("PhongBan"):
+                updates_nv.append("PhongBan = %s")
+                params_nv.append(data["PhongBan"])
+                
+            if data.get("ChucVu"):
+                updates_nv.append("ChucVu = %s")
+                params_nv.append(data["ChucVu"])
+                
+            if updates_nv:
+                params_nv.append(id_nv)
+                sql_nv = f"UPDATE NHANVIEN SET {', '.join(updates_nv)} WHERE ID_NV = %s"
+                cursor.execute(sql_nv, tuple(params_nv))
+                
+            conn.commit()
     except Exception as e:
         conn.rollback()
         raise e
