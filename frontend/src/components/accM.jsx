@@ -83,6 +83,7 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
           VaiTro: formData.VaiTro,
           PhongBan: formData.PhongBan,
           ChucVu: formData.ChucVu,
+          Email: formData.Email,
         };
 
         await axios.put(
@@ -146,7 +147,11 @@ const AccountModal = ({ onClose, refresh, accountData }) => {
           disabled={isEdit}
         />
 
-        <input value={formData.Email} disabled />
+        <input 
+          value={formData.Email} 
+          placeholder="Email"
+          onChange={(e) => setFormData({ ...formData, Email: e.target.value })} 
+        />
 
         <select
           value={formData.VaiTro}

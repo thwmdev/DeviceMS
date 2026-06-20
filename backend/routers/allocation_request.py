@@ -8,6 +8,7 @@ from models.allocation_requests import (
     reject_allocation_request,
 )
 from security.roles import token_and_role_required
+from services.email_service import send_request_decision_email
 
 
 allocation_request_bp = Blueprint("allocation_request", __name__)
@@ -125,7 +126,21 @@ def create_request():
 @token_and_role_required(allowed_roles=APPROVE_ROLES)
 def approve_request(request_id):
     try:
-        approve_allocation_request(request_id, request.json or {}, _reviewer_name())
+        info = approve_allocation_request(request_id, request.json or {}, _reviewer_name())
+
+        # Gửi email thông báo bất đồng bộ (không block response nếu lỗi)
+        if info and info.get("email"):
+            send_request_decision_email(
+                to_email=info["email"],
+                ho_ten=info["ho_ten"],
+                request_id=request_id,
+                loai_yeu_cau=info["loai_yeu_cau"],
+                ten_thiet_bi=info["ten_thiet_bi"],
+                decision="approved",
+                reviewer=info["reviewer"],
+                note=info.get("note", ""),
+            )
+
         return jsonify({"message": "Chap nhan yeu cau thanh cong."}), 200
     except ValueError as e:
         return jsonify({"message": str(e)}), 400
@@ -137,7 +152,21 @@ def approve_request(request_id):
 @token_and_role_required(allowed_roles=APPROVE_ROLES)
 def reject_request(request_id):
     try:
-        reject_allocation_request(request_id, request.json or {}, _reviewer_name())
+        info = reject_allocation_request(request_id, request.json or {}, _reviewer_name())
+
+        # Gửi email thông báo bất đồng bộ (không block response nếu lỗi)
+        if info and info.get("email"):
+            send_request_decision_email(
+                to_email=info["email"],
+                ho_ten=info["ho_ten"],
+                request_id=request_id,
+                loai_yeu_cau=info["loai_yeu_cau"],
+                ten_thiet_bi=info["ten_thiet_bi"],
+                decision="rejected",
+                reviewer=info["reviewer"],
+                note=info.get("note", ""),
+            )
+
         return jsonify({"message": "Tu choi yeu cau thanh cong."}), 200
     except ValueError as e:
         return jsonify({"message": str(e)}), 400

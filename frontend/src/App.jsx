@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 import Login from "./pages/login"; 
 import AllocationRequests from "./pages/allocationRequests";
@@ -13,6 +14,8 @@ import { ConfirmProvider } from "./components/ConfirmDialog";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+
 
 function ProtectedDashboard() {
   const role = getStoredRole();
@@ -22,7 +25,8 @@ function ProtectedDashboard() {
 
 function App() {
   return (
-    <Router>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <Router>
       <ConfirmProvider>
         <Routes>
 
@@ -57,8 +61,9 @@ function App() {
           pauseOnHover
           theme="light"
         />
-      </ConfirmProvider>
-    </Router>
+        </ConfirmProvider>
+      </Router>
+    </GoogleOAuthProvider>
   );
 }
 

@@ -2,6 +2,11 @@ import os
 import sys
 from flask import Flask, make_response, request
 from flask_cors import CORS
+from dotenv import load_dotenv
+
+# Load .env từ thư mục gốc dự án (một cấp trên backend/)
+_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(_base_dir, ".env"))
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from routers.auth import auth_bp

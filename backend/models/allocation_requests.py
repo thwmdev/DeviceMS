@@ -448,7 +448,7 @@ def _get_device(cursor, device_id):
 
 def _get_employee(cursor, employee_id):
     cursor.execute(
-        f"SELECT ID_NV, HoTen FROM {EMPLOYEE_TABLE} WHERE ID_NV = %s",
+        f"SELECT ID_NV, HoTen, Email FROM {EMPLOYEE_TABLE} WHERE ID_NV = %s",
         (employee_id,),
     )
     return cursor.fetchone()
@@ -622,6 +622,10 @@ def create_allocation_request(data):
 
 
 def approve_allocation_request(request_id, data, reviewer):
+    """
+    Chấp nhận yêu cầu cấp phát hoặc thu hồi.
+    Trả về dict chứa thông tin cần thiết để gửi email thông báo.
+    """
     ensure_allocation_tables()
     conn = None
     cursor = None
@@ -644,8 +648,16 @@ def approve_allocation_request(request_id, data, reviewer):
         note = _clean_text(data.get("GhiChuDuyet"))[:255]
         reviewer_name = _clean_text(reviewer, "system")[:50]
 
+        # Lấy thông tin nhân viên (bao gồm email) để gửi thông báo
+        employee = _get_employee(cursor, request_row["ID_NV"])
+        ho_ten = employee["HoTen"] if employee else ""
+        email_nv = employee["Email"] if employee else ""
+
+        # Lấy tên thiết bị
+        device = _get_device(cursor, request_row["ID_TB"]) if request_row.get("ID_TB") else None
+        ten_thiet_bi = device["TenThietBi"] if device else ""
+
         if request_row["LoaiYeuCau"] == REQUEST_TYPE_ALLOCATE:
-            device = _get_device(cursor, request_row["ID_TB"])
             if not device:
                 raise ValueError("Thiet bi khong ton tai.")
             if _device_status_key(device.get("TrangThai")) != "SAN_SANG":
@@ -728,6 +740,16 @@ def approve_allocation_request(request_id, data, reviewer):
             )
 
         conn.commit()
+
+        # Trả về thông tin để router gửi email thông báo
+        return {
+            "email": email_nv,
+            "ho_ten": ho_ten,
+            "loai_yeu_cau": request_row["LoaiYeuCau"],
+            "ten_thiet_bi": ten_thiet_bi,
+            "note": note,
+            "reviewer": reviewer_name,
+        }
     except Exception:
         if conn:
             conn.rollback()
@@ -740,6 +762,10 @@ def approve_allocation_request(request_id, data, reviewer):
 
 
 def reject_allocation_request(request_id, data, reviewer):
+    """
+    Từ chối yêu cầu cấp phát hoặc thu hồi.
+    Trả về dict chứa thông tin cần thiết để gửi email thông báo.
+    """
     ensure_allocation_tables()
     conn = None
     cursor = None
@@ -750,7 +776,15 @@ def reject_allocation_request(request_id, data, reviewer):
 
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            f"SELECT TrangThaiDuyet FROM {REQUEST_TABLE} WHERE ID_YC = %s FOR UPDATE",
+            f"""
+            SELECT y.TrangThaiDuyet, y.ID_NV, y.ID_TB, y.LoaiYeuCau,
+                   nv.HoTen, nv.Email, tb.TenThietBi
+            FROM {REQUEST_TABLE} y
+            LEFT JOIN {EMPLOYEE_TABLE} nv ON nv.ID_NV = y.ID_NV
+            LEFT JOIN {DEVICE_TABLE} tb ON tb.ID_TB = y.ID_TB
+            WHERE y.ID_YC = %s
+            FOR UPDATE
+            """,
             (request_id,),
         )
         row = cursor.fetchone()
@@ -773,6 +807,16 @@ def reject_allocation_request(request_id, data, reviewer):
             (STATUS_REJECTED, reviewer_name, note or None, request_id),
         )
         conn.commit()
+
+        # Trả về thông tin để router gửi email thông báo
+        return {
+            "email": row.get("Email") or "",
+            "ho_ten": row.get("HoTen") or "",
+            "loai_yeu_cau": row.get("LoaiYeuCau") or "",
+            "ten_thiet_bi": row.get("TenThietBi") or "",
+            "note": note,
+            "reviewer": reviewer_name,
+        }
     except Exception:
         if conn:
             conn.rollback()

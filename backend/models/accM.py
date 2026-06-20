@@ -152,6 +152,10 @@ def update_account_db(matk, data):
             if data.get("ChucVu"):
                 updates_nv.append("ChucVu = %s")
                 params_nv.append(data["ChucVu"])
+
+            if "Email" in data:
+                updates_nv.append("Email = %s")
+                params_nv.append(data["Email"])
                 
             if updates_nv:
                 params_nv.append(id_nv)

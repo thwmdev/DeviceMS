@@ -163,6 +163,69 @@
   padding: 12px 14px;
 }
 
+/* --- GOOGLE LOGIN DIVIDER --- */
+.login-divider {
+  position: relative;
+  margin: 20px 0 16px;
+  text-align: center;
+}
+
+.login-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+  transform: translateY(-50%);
+}
+
+.login-divider-text {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  padding: 0 12px;
+  background: rgba(251, 250, 247, 0.92);
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* --- GOOGLE LOGIN WRAPPER --- */
+.login-google-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+.login-google-wrapper > div,
+.login-google-wrapper iframe {
+  width: 100% !important;
+  border-radius: 999px !important;
+}
+
+.login-google-loading {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--surface-quiet);
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+
 /* --- GLOBAL FEEDBACK --- */
 .app-toast-container {
   width: min(420px, calc(100vw - 24px));
