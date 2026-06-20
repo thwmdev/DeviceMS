@@ -8,6 +8,8 @@ import "../styles/acc.css";
 import { getRoleLabel } from "../utils/roles";
 import { useConfirm } from "../components/confirmContext";
 import { toast } from "react-toastify";
+import SortableHeader from "../components/SortableHeader";
+import { getNextSort, sortRows } from "../utils/tableSort";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
   || (import.meta.env.DEV ? "http://127.0.0.1:5000/api" : "/api");
@@ -22,6 +24,11 @@ const Accounts = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: "TenDangNhap", direction: "asc" });
 
   const fetchAccounts = async () => {
     try {
@@ -82,8 +89,35 @@ const Accounts = () => {
     fetchAccounts();
   }, []);
 
-  const totalPages = Math.ceil((accounts || []).length / itemsPerPage) || 1;
-  const currentAccounts = (accounts || []).slice(
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, sortConfig]);
+
+  let filteredAccounts = accounts || [];
+
+  if (search) {
+    const lowerSearch = search.toLowerCase();
+    filteredAccounts = filteredAccounts.filter(acc => 
+      acc.TenDangNhap?.toLowerCase().includes(lowerSearch) ||
+      getRoleLabel(acc.VaiTro)?.toLowerCase().includes(lowerSearch)
+    );
+  }
+
+  if (statusFilter) {
+    filteredAccounts = filteredAccounts.filter(acc => acc.TrangThai === statusFilter);
+  }
+
+  const sortedAccounts = sortRows(filteredAccounts, sortConfig);
+
+  const totalPages = Math.ceil(sortedAccounts.length / itemsPerPage) || 1;
+  const currentAccounts = sortedAccounts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -117,12 +151,56 @@ const Accounts = () => {
           />
         )}
 
+        <div className="search-container">
+          <input
+            type="text"
+            placeholder="Tìm theo username hoặc vai trò..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="HoatDong">Hoạt động</option>
+            <option value="Khoa">Khóa</option>
+          </select>
+          {search && (
+            <span className="search-result-hint">
+              Kết quả cho &quot;{search}&quot;: {filteredAccounts.length} tài khoản
+            </span>
+          )}
+        </div>
+
         <table className="data-table">
           <thead>
             <tr>
-              <th>Username</th>
-              <th>Vai trò</th>
-              <th>Trạng thái</th>
+              <th>
+                <SortableHeader
+                  label="Username"
+                  sortKey="TenDangNhap"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Vai trò"
+                  sortKey="VaiTro"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Trạng thái"
+                  sortKey="TrangThai"
+                  sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))}
+                />
+              </th>
               <th>Thao tác</th>
             </tr>
           </thead>
