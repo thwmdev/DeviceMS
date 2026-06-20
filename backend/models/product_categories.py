@@ -4,8 +4,8 @@ from database.db import get_connection
 TABLE_NAME = "DANHMUCSANPHAM"
 
 
-def _ensure_ma_dot_column():
-    """Tự động thêm cột MaDot nếu chưa có."""
+def _ensure_columns():
+    """Tự động thêm các cột tuỳ chọn nếu chưa có (MaDot, ThoiGianKhauHao)."""
     conn = None
     cursor = None
     try:
@@ -13,6 +13,8 @@ def _ensure_ma_dot_column():
         if not conn:
             return
         cursor = conn.cursor(dictionary=True)
+
+        # MaDot
         cursor.execute(
             """
             SELECT COUNT(*) AS cnt
@@ -25,11 +27,30 @@ def _ensure_ma_dot_column():
         if cursor.fetchone()["cnt"] == 0:
             cursor.execute("ALTER TABLE DANHMUCSANPHAM ADD COLUMN MaDot VARCHAR(50) NULL")
             conn.commit()
+
+        # ThoiGianKhauHao (đơn vị: năm)
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'DANHMUCSANPHAM'
+              AND COLUMN_NAME = 'ThoiGianKhauHao'
+            """
+        )
+        if cursor.fetchone()["cnt"] == 0:
+            cursor.execute("ALTER TABLE DANHMUCSANPHAM ADD COLUMN ThoiGianKhauHao INT NULL DEFAULT NULL")
+            conn.commit()
     finally:
         if cursor:
             cursor.close()
         if conn:
             conn.close()
+
+
+# Backward-compat alias
+def _ensure_ma_dot_column():
+    _ensure_columns()
 
 
 def ensure_category_table():
@@ -49,6 +70,7 @@ def ensure_category_table():
                 TenDanhMuc VARCHAR(100) NOT NULL,
                 MoTa VARCHAR(255),
                 TrangThai VARCHAR(20) NOT NULL DEFAULT 'HoatDong',
+                ThoiGianKhauHao INT NULL DEFAULT NULL,
                 NgayTao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 NgayCapNhat DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             )
@@ -68,6 +90,7 @@ def normalize_category(row):
 
     ngay_tao = row.get("NgayTao")
     ngay_cap_nhat = row.get("NgayCapNhat")
+    thoi_gian_khau_hao = row.get("ThoiGianKhauHao")
 
     return {
         "ID_DM": row["ID_DM"],
@@ -75,6 +98,7 @@ def normalize_category(row):
         "TenDanhMuc": row["TenDanhMuc"],
         "MoTa": row.get("MoTa") or "",
         "TrangThai": row["TrangThai"],
+        "ThoiGianKhauHao": int(thoi_gian_khau_hao) if thoi_gian_khau_hao is not None else None,
         "NgayTao": ngay_tao.isoformat() if hasattr(ngay_tao, "isoformat") else str(ngay_tao or ""),
         "NgayCapNhat": ngay_cap_nhat.isoformat() if hasattr(ngay_cap_nhat, "isoformat") else str(ngay_cap_nhat or ""),
         "MaDot": row.get("MaDot") or "",
@@ -86,6 +110,18 @@ def validate_category_payload(data, is_update=False):
     name = str(data.get("TenDanhMuc", "")).strip()
     description = str(data.get("MoTa", "")).strip()
     status = str(data.get("TrangThai", "HoatDong")).strip() or "HoatDong"
+
+    # ThoiGianKhauHao: optional, đơn vị tháng
+    raw_tgkh = data.get("ThoiGianKhauHao")
+    if raw_tgkh is None or str(raw_tgkh).strip() == "":
+        thoi_gian_khau_hao = None
+    else:
+        try:
+            thoi_gian_khau_hao = int(raw_tgkh)
+        except (ValueError, TypeError):
+            raise ValueError("Thoi gian khau hao phai la so nguyen.")
+        if thoi_gian_khau_hao < 1 or thoi_gian_khau_hao > 100:
+            raise ValueError("Thoi gian khau hao phai tu 1 den 100 nam.")
 
     if not code:
         raise ValueError("Ma danh muc khong duoc de trong.")
@@ -105,12 +141,13 @@ def validate_category_payload(data, is_update=False):
         "TenDanhMuc": name,
         "MoTa": description or None,
         "TrangThai": status,
+        "ThoiGianKhauHao": thoi_gian_khau_hao,
     }
 
 
 def get_categories_paginated(page=1, limit=10, search="", batch_id=""):
     ensure_category_table()
-    _ensure_ma_dot_column()
+    _ensure_columns()
     conn = None
     cursor = None
     try:
@@ -162,7 +199,7 @@ def get_categories_paginated(page=1, limit=10, search="", batch_id=""):
 
 def get_category_batches():
     """Trả về danh sách các mã đợt đã dùng."""
-    _ensure_ma_dot_column()
+    _ensure_columns()
     conn = None
     cursor = None
     try:
@@ -202,7 +239,7 @@ def get_category_by_id(category_id):
 
 def create_category(data):
     ensure_category_table()
-    _ensure_ma_dot_column()
+    _ensure_columns()
     payload = validate_category_payload(data)
     ma_dot = str(data.get("MaDot") or "").strip() or None
     conn = None
@@ -215,14 +252,15 @@ def create_category(data):
         cursor = conn.cursor()
         cursor.execute(
             f"""
-            INSERT INTO {TABLE_NAME} (MaDanhMuc, TenDanhMuc, MoTa, TrangThai, MaDot)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO {TABLE_NAME} (MaDanhMuc, TenDanhMuc, MoTa, TrangThai, ThoiGianKhauHao, MaDot)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (
                 payload["MaDanhMuc"],
                 payload["TenDanhMuc"],
                 payload["MoTa"],
                 payload["TrangThai"],
+                payload["ThoiGianKhauHao"],
                 ma_dot,
             ),
         )
@@ -272,7 +310,8 @@ def update_category(category_id, data):
             SET MaDanhMuc = %s,
                 TenDanhMuc = %s,
                 MoTa = %s,
-                TrangThai = %s
+                TrangThai = %s,
+                ThoiGianKhauHao = %s
             WHERE ID_DM = %s
             """,
             (
@@ -280,6 +319,7 @@ def update_category(category_id, data):
                 payload["TenDanhMuc"],
                 payload["MoTa"],
                 payload["TrangThai"],
+                payload["ThoiGianKhauHao"],
                 category_id,
             ),
         )

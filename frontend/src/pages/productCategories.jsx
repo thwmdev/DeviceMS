@@ -18,6 +18,7 @@ const EMPTY_ROW = {
   TenDanhMuc: "",
   MoTa: "",
   TrangThai: "HoatDong",
+  ThoiGianKhauHao: "",
 };
 
 const EMPTY_EDIT_FORM = {
@@ -25,6 +26,7 @@ const EMPTY_EDIT_FORM = {
   TenDanhMuc: "",
   MoTa: "",
   TrangThai: "HoatDong",
+  ThoiGianKhauHao: "",
 };
 
 const STATUS_LABEL = {
@@ -228,6 +230,7 @@ export default function ProductCategories() {
       TenDanhMuc: category.TenDanhMuc || "",
       MoTa: category.MoTa || "",
       TrangThai: category.TrangThai || "HoatDong",
+      ThoiGianKhauHao: category.ThoiGianKhauHao != null ? String(category.ThoiGianKhauHao) : "",
     });
     setEditError("");
     setOpenEditModal(true);
@@ -239,6 +242,13 @@ export default function ProductCategories() {
     if (editForm.MaDanhMuc.trim().length > 30) { setEditError("Mã danh mục không được vượt quá 30 ký tự."); return false; }
     if (editForm.TenDanhMuc.trim().length > 100) { setEditError("Tên danh mục không được vượt quá 100 ký tự."); return false; }
     if (editForm.MoTa.trim().length > 255) { setEditError("Mô tả không được vượt quá 255 ký tự."); return false; }
+    if (editForm.ThoiGianKhauHao !== "" && editForm.ThoiGianKhauHao !== null) {
+      const v = Number(editForm.ThoiGianKhauHao);
+      if (!Number.isInteger(v) || v < 1 || v > 100) {
+        setEditError("Thời gian khấu hao phải là số nguyên từ 1 đến 100 năm.");
+        return false;
+      }
+    }
     setEditError("");
     return true;
   };
@@ -247,7 +257,13 @@ export default function ProductCategories() {
     if (!validateEditForm()) return;
     try {
       setLoading(true);
-      await axios.put(`${API_URL}/update/${editingId}`, editForm, { headers: authHeader() });
+      const payload = {
+        ...editForm,
+        ThoiGianKhauHao: editForm.ThoiGianKhauHao !== "" && editForm.ThoiGianKhauHao !== null
+          ? Number(editForm.ThoiGianKhauHao)
+          : null,
+      };
+      await axios.put(`${API_URL}/update/${editingId}`, payload, { headers: authHeader() });
       toast.success("Cập nhật danh mục thành công.");
       setOpenEditModal(false);
       await loadCategories();
@@ -357,6 +373,10 @@ export default function ProductCategories() {
                   onSort={(key) => setSortConfig((current) => getNextSort(current, key))} />
               </th>
               <th>
+                <SortableHeader label="TG khấu hao (năm)" sortKey="ThoiGianKhauHao" sortConfig={sortConfig}
+                  onSort={(key) => setSortConfig((current) => getNextSort(current, key))} />
+              </th>
+              <th>
                 <SortableHeader label="Trạng thái" sortKey="TrangThaiText" sortConfig={sortConfig}
                   onSort={(key) => setSortConfig((current) => getNextSort(current, key))} />
               </th>
@@ -369,15 +389,24 @@ export default function ProductCategories() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6">Đang tải dữ liệu...</td></tr>
+              <tr><td colSpan="7">Đang tải dữ liệu...</td></tr>
             ) : currentCategories.length === 0 ? (
-              <tr><td colSpan="6">Không có dữ liệu</td></tr>
+              <tr><td colSpan="7">Không có dữ liệu</td></tr>
             ) : (
               currentCategories.map((category) => (
                 <tr key={category.ID_DM}>
                   <td>{category.MaDanhMuc}</td>
                   <td>{category.TenDanhMuc}</td>
                   <td>{category.MoTa || "-"}</td>
+                  <td style={{ textAlign: "center" }}>
+                    {category.ThoiGianKhauHao != null ? (
+                      <span className="status-badge" style={{ background: "rgba(99,179,237,0.15)", color: "#3182ce", borderColor: "rgba(99,179,237,0.3)" }}>
+                        {category.ThoiGianKhauHao} năm
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--text-muted, #888)" }}>—</span>
+                    )}
+                  </td>
                   <td>
                     <span className={`status-badge category-status-${category.TrangThai}`}>
                       {STATUS_LABEL[category.TrangThai] || category.TrangThai}
@@ -440,6 +469,7 @@ export default function ProductCategories() {
                         <th style={{ minWidth: 130 }}>Mã danh mục <span>*</span></th>
                         <th style={{ minWidth: 200 }}>Tên danh mục <span>*</span></th>
                         <th style={{ minWidth: 250 }}>Mô tả</th>
+                        <th style={{ minWidth: 130 }}>TG khấu hao (năm)</th>
                         <th style={{ minWidth: 120 }}>Trạng thái</th>
                         <th style={{ minWidth: 40 }}></th>
                       </tr>
@@ -473,6 +503,17 @@ export default function ProductCategories() {
                               placeholder="Mô tả ngắn..."
                               value={row.MoTa}
                               onChange={(e) => setBatchRowField(idx, "MoTa", e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              style={{ width: "100%" }}
+                              placeholder="VD: 3"
+                              min="1"
+                              max="100"
+                              value={row.ThoiGianKhauHao}
+                              onChange={(e) => setBatchRowField(idx, "ThoiGianKhauHao", e.target.value)}
                             />
                           </td>
                           <td>
@@ -562,18 +603,31 @@ export default function ProductCategories() {
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Trạng thái</label>
-                  <select
-                    value={editForm.TrangThai}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, TrangThai: e.target.value }))}
-                    disabled
-                    style={{ backgroundColor: "var(--bg-light)", cursor: "not-allowed", opacity: 0.8 }}
-                    title="Trạng thái chỉ có thể thay đổi bằng nút Tạm dừng/Kích hoạt ở bảng danh sách."
-                  >
-                    <option value="HoatDong">Hoạt động</option>
-                    <option value="TamDung">Tạm dừng</option>
-                  </select>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Thời gian khấu hao mặc định (năm)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={editForm.ThoiGianKhauHao}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, ThoiGianKhauHao: e.target.value }))}
+                      placeholder="VD: 3 (để trống nếu không áp dụng)"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Trạng thái</label>
+                    <select
+                      value={editForm.TrangThai}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, TrangThai: e.target.value }))}
+                      disabled
+                      style={{ backgroundColor: "var(--bg-light)", cursor: "not-allowed", opacity: 0.8 }}
+                      title="Trạng thái chỉ có thể thay đổi bằng nút Tạm dừng/Kích hoạt ở bảng danh sách."
+                    >
+                      <option value="HoatDong">Hoạt động</option>
+                      <option value="TamDung">Tạm dừng</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="form-group">
